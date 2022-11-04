@@ -1,0 +1,11 @@
+library(shiny)
+library(shinydashboard)
+library(shinythemes)
+library(shinyjs) 
+library(shinyWidgets)
+library(pcaMethods)
+library(readxl)
+library(openxlsx)
+options(warn = -1)
+options(shiny.maxRequestSize = 30 * 1024 ^ 2)
+
