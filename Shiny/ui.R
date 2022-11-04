@@ -1,4 +1,4 @@
-header<-dashboardHeader(title = "PCA",
+header<-dashboardHeader(title = "PLS",
                         tags$li(actionLink("openModal", label = "", 
                                            icon = icon("address-card")),
                                 class = "dropdown"))
