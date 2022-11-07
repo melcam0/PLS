@@ -5,14 +5,28 @@ header<-dashboardHeader(title = "PLS",
 
 sidebar<- dashboardSidebar(
     sidebarMenu(
-                menuItem(text = "Dati",icon = shiny::icon("file-text"),
-                  menuItem("Esempi",tabName = "esempi"),
-                  menuItem("Importa dati",tabName = "importa"),
-                  menuItem("Variabili",tabName = "variabili"),
-                  menuItem("Oggetti",tabName = "oggetti"),
-                  menuItem("Vedi dati",tabName = "vedi"),
-                  actionButton("reset","Reset",style='padding:4px; font-size:80%')
+                menuItem(text = "Data",icon = shiny::icon("file-text"),
+                  menuItem("Examples",tabName = "esempi"),
+                  menuItem("Load data",tabName = "importa"),
+                  menuItem("Variables",tabName = "variabili"),
+                  menuItem("Objects",tabName = "oggetti"),
+                  menuItem("Show data",tabName = "vedi"),
+                  
+                  
+   
+                  
+                  menuItem("Row profile",tabName = "profile"),
+                  
+                  
+                  actionButton("reset","Delete",style='padding:4px; font-size:80%')
                   ),
+                
+                
+                
+                
+                
+                
+                
                 menuItem(text = "PCA",icon = shiny::icon("expand-arrows-alt"),
                   menuItem("Model computation",tabName = "modello"),
                   menuItem("Missing data recostruction",tabName = "dati_mancanti"),
@@ -40,14 +54,14 @@ sidebar<- dashboardSidebar(
                          # menuSubItem("Dispensa",tabName = "dispensa"),
                          # menuSubItem("Diapositive",tabName = "diapositive"),
                          tags$header(
-                           em(  
-                             a(href="https://dispensepca.netlify.app/",  "   Dispense" ,target="_blank",style="white-space: pre-wrap")
-                           )
+                           # em(  
+                           #   a(href="https://dispensepca.netlify.app/",  "   Dispense" ,target="_blank",style="white-space: pre-wrap")
+                           # )
                          ),
                          br(),
                          actionButton("quit", "Quit",onclick = "setTimeout(function(){window.close();},200);",
                                       style='padding:4px; font-size:80%'),
-                         HTML('<p><center><font color="cyan"><br> Version 3.0 </font></center>')
+                         HTML('<p><center><font color="cyan"><br> Version 1.0 </font></center>')
                 )
                         ))
 
@@ -59,7 +73,7 @@ body<-dashboardBody(
   fluidRow(useShinyjs(),
     tabItems(
       tabItem(tabName = "esempi",
-              fluidPage(titlePanel("Seleziona dati esempio"),
+              fluidPage(titlePanel("Select example data"),
               column(12,
                      uiOutput('lista_esempi')),
               column(2,
@@ -71,17 +85,17 @@ body<-dashboardBody(
                      div(style = 'overflow-x: scroll;',tableOutput("dati_esempio"))))),
       
       tabItem(tabName = "importa",
-              fluidPage(titlePanel("Importa dati"),
+              fluidPage(titlePanel("Load data"),
                 tabsetPanel(type = "tabs",
                             tabPanel("Excel",
                                      column(12,
-                                       fileInput("file_xlsx", "Scegli file Excel",
+                                       fileInput("file_xlsx", "Select file Excel",
                                                    multiple = FALSE,
                                                    accept = c(".xlx",".xlsx"))),
                                      column(12,
                                             checkboxInput("header", "Header", TRUE)),
                                      column(2,
-                                           numericInput("foglio_n", label = "Foglio n.",value = 1,min = 1,max = 100)
+                                           numericInput("foglio_n", label = "Sheet n.",value = 1,min = 1,max = 100)
                                             ),
                                      column(2,
                                             radioButtons("disp_xlx", "Display",
@@ -93,7 +107,7 @@ body<-dashboardBody(
                                             div(style = 'overflow-x: scroll;',tableOutput("contents_xlsx")))),
                             tabPanel("CSV", 
                                      column(12,
-                                            fileInput("file_csv", "Scegli file CSV",
+                                            fileInput("file_csv", "Select file CSV",
                                                       multiple = FALSE,accept = c(".csv")
                                             )),
                                      column(12,
@@ -117,10 +131,10 @@ body<-dashboardBody(
                                      
                                      column(8,
                                             div(style = 'overflow-x: scroll;',tableOutput("contents_csv")))),
-                            tabPanel("Incolla",
+                            tabPanel("Paste",
                                      column(12,
                                             br(),
-                                            actionButton("file_incolla", label = "Incolla"),
+                                            actionButton("file_incolla", label = "Paste"),
                                             br(),
                                             br(),
                                             br(),
@@ -132,34 +146,95 @@ body<-dashboardBody(
                                                          selected = "head")),
                                      column(8,
                                             div(style = 'overflow-x: scroll;',tableOutput("contents_incolla"))))))),
-      
+
       tabItem(tabName = "variabili",
-              fluidPage(titlePanel("Variabili"),
+              fluidPage(titlePanel("Variables"),
                         tabsetPanel(type = "tabs",
-                                    tabPanel("Variabile nomi righe",
+                                    tabPanel("Row names variable",
                                              column(12,
                                                 uiOutput("var_nomi"),
                                                 textOutput("avviso_nomi")),
                                              column(12,"Nomi righe",
                                                 verbatimTextOutput("nomi_righe"))),
-                                    tabPanel("Variabili supplementari",
+                                    tabPanel("Supplementary variables",
                                              column(4,
                                                  uiOutput("var_quali"),
+                                                 
+                                                 
+                                                
+                                                 
+                                                 
                                                  uiOutput('var_quanti_sup')),
-                                             column(8,"Variabili quantitative per la pca",
-                                                verbatimTextOutput("var_quanti")))))),
-      
+                                             column(8,"Quantitative variables for pls",
+                                                verbatimTextOutput("var_quanti"))),
+                                    
+                                    
+                                    
+                                    tabPanel("Responce variable",
+                                             column(12,
+                                                    uiOutput("var_y")))
+                                    
+                                    
+                                    
+                                    
+                                    ))),
+
       tabItem(tabName = "oggetti",
-              fluidPage(titlePanel("Oggetti"),
+              fluidPage(titlePanel("Objects"),
                         column(4,
                                uiOutput("righe_tolte")),
-                        column(8,"Righe cancellate",
+                        column(8,"Rows deleted",
                                verbatimTextOutput("righe_restanti"),
-                               actionButton("desel_righe","Deseleziona tutte le righe")))), 
+                               actionButton("desel_righe","Deselect all rows")))), 
 
       tabItem(tabName = "vedi",
               fluidPage(titlePanel("Dati"),
                         div(style = 'overflow-x: scroll;',DT::dataTableOutput("dati")))),
+      
+      
+      
+      
+      
+      
+      
+      
+      tabItem(tabName = "profile",
+              fluidPage(titlePanel("Row profile"),
+                        column(8,
+                               plotOutput('profile_plot')),
+                        column(4,
+                               uiOutput('profile_col'),
+                               
+                               
+                               
+                               # selectInput("profile_transf", label = "Transformations", 
+                               #             choices = list("None" = 1, "Autoscaling (SNV)" = 2, "Binning" = 3, "First Derivative" = 4,
+                               #                            "Second Derivative" = 5, "Savitzky-Golay" = 6), 
+                               #             selected = 1)
+                               
+                               
+                               pickerInput("profile_transf", label = "Transformations",
+                                           choices = list("Autoscaling (SNV)", "Binning", "First Derivative",
+                                                          "Second Derivative", "Savitzky-Golay"),
+                                           options =  list(
+                                             "max-options" = 1,
+                                             "max-options-text" = "No more!"
+                                           ),
+                                           multiple = TRUE),
+                               
+                               actionButton("profile_reset","Reset",style='padding:4px; font-size:80%')
+                               
+                               
+                               
+                           
+                               
+                               
+                               )
+                        
+                        
+                        
+                        
+                        )), 
       
 # PCA -------------------------------------------------------------------    
 
@@ -181,7 +256,6 @@ body<-dashboardBody(
                                actionButton("bpcamodel", label = "Execute")),
                         column(12,hr()),
                         column(8,
-                              
                                plotOutput('scree_plot',height = "600px")),
                         column(4,
                                uiOutput('pca_var_type')),
@@ -513,7 +587,7 @@ tabItem(tabName = "ext_qcontr",
 
 
 ui <- dashboardPage(skin = 'purple',header, sidebar, body,
-                    tags$head(HTML("<title>PCA</title>"),tags$link(rel = "stylesheet", type = "text/css", href = "tema.css"),
+                    tags$head(HTML("<title>PLS</title>"),tags$link(rel = "stylesheet", type = "text/css", href = "tema.css"),
                               tags$link(rel = "shortcut icon", href = "pca.ico")))
 
 

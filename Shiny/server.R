@@ -110,11 +110,12 @@ server <- function (input , output, session ){
     dati$DS<-NULL
     dati$DS_nr=NULL
     dati$DS_righe=NULL
+    dati$DS_tr=NULL
     dati$nr=NULL
     dati$var=NULL
     dati$var_nr=NULL
     dati$var_qt=NULL
-    var_qt_sup=NULL
+    dati$var_qt_sup=NULL
     dati$var_ql=NULL
     dati$righe=NULL
     dati$righe_rest=NULL
@@ -163,12 +164,11 @@ server <- function (input , output, session ){
 
 # reactiveValues ----------------------------------------------------------
   
-  dati<-reactiveValues(DS=NULL,DS_nr=NULL,DS_righe=NULL,nr=NULL,var=NULL,var_nr=NULL,
+  dati<-reactiveValues(DS=NULL,DS_nr=NULL,DS_righe=NULL,DS_tr=NULL,nr=NULL,var=NULL,var_nr=NULL,
                        var_qt=NULL,var_qt_sup=NULL,var_ql=NULL,righe=NULL,righe_rest=NULL,righe_tolte=NULL,
                        var_gr=NULL)
   
   dati_ext<-reactiveValues(DS=NULL,DS_nr=NULL,nr=NULL)
-  
   
   PCA <- reactiveValues(res=NULL,dataset=NULL,center=NULL,scale=NULL,centered=NULL,scaled=NULL,sgt=NULL,type=NULL,
                         T2=NULL,Q=NULL,d_T2=NULL,d_Q=NULL,c_T2=NULL,c_Q=NULL,rnd=NULL)
@@ -338,10 +338,36 @@ server <- function (input , output, session ){
 
 # variabili qualitative ---------------------------------------------------
   
+  # output$var_quali<-renderUI({
+  #   checkboxGroupInput(inputId = "var_ql",label = "Select supplementary variables",
+  #                      choices = dati$var,selected =dati$var_ql)
+  # })
+  
+  
+  
   output$var_quali<-renderUI({
-    checkboxGroupInput(inputId = "var_ql",label = "seleziona le variabili supplementari",
-                       choices = dati$var,selected =dati$var_ql)
+    selectizeInput(inputId = "var_ql"," ",
+                   choices = dati$var,
+                   multiple = TRUE,
+                   options = list(
+                     placeholder = 'Select supplementary variables',
+                     onInitialize = I('function() { this.setValue(""); }')
+                   ))
   })
+  
+  
+  
+  
+  # output$var_quali <- renderUI({
+  #   pickerInput("var_ql", label = "",
+  #               choices = dati$var,
+  #               # options =  list(
+  #               #   # "max-options" = 1,
+  #               #   "max-options-text" = "No more!"
+  #               # ),
+  #               # 
+  #               multiple = TRUE)
+  # })
   
   observeEvent(input$var_ql,ignoreNULL = FALSE,{
     dati$var_ql<-input$var_ql
@@ -353,7 +379,7 @@ server <- function (input , output, session ){
     if(!length(dati$var_qt)==0){
       dati$var_qt
     }else{
-      "Non ci sono variabili quantitative"
+      "No supplementary variables"
     }
   })
   
@@ -364,7 +390,7 @@ server <- function (input , output, session ){
     selectizeInput(inputId = "var_nr"," ",
                        choices = dati$var_nr,
                    options = list(
-                     placeholder = 'Selezione eventuale colonna nomi righe',
+                     placeholder = 'Select column row names',
                      onInitialize = I('function() { this.setValue(""); }')
                    ))
   })
@@ -399,17 +425,31 @@ server <- function (input , output, session ){
   output$nomi_righe<-renderPrint({
     validate(need(nrow(dati$DS)!=0,""))
     if(length(dati$nr)==0){
-      "Non c'è colonna nomi righe "
+      "No column row names"
     } else {
       dati$nr
       }
     })
   
+# variabile risposta ------------------------------------------------------
 
+  output$var_y<-renderUI({
+    selectizeInput(inputId = "var_y"," ",
+                   choices = dati$var_qt,
+                   options = list(
+                     placeholder = 'Select responce variable',
+                     onInitialize = I('function() { this.setValue(""); }')
+                   ))
+  })
+  
+  # observeEvent(input$var_y,{
+  #   dati$var_y<-input$var_y
+  # }) se non serve cancellare dati$var_y
+  
 # oggetti  ------------------------------------------------
   
   output$righe_tolte<-renderUI({
-    checkboxGroupInput(inputId = "righe_tolte",label = "seleziona le righe da cancellare",
+    checkboxGroupInput(inputId = "righe_tolte",label = "select rows to delete",
                        choices = dati$righe,selected =dati$righe_tolte)
   })
   
@@ -431,7 +471,7 @@ server <- function (input , output, session ){
     if(!length(dati$righe_tolte)==0){
       dati$righe_tolte
     }else{
-     "Non ci sono righe cancellate"
+     "No rows deleted"
     }
   })
   
@@ -440,6 +480,104 @@ server <- function (input , output, session ){
     dati$righe_tolte<-NULL
     dati$righe_rest<-dati$righe
   })
+  
+
+# profile -----------------------------------------------------------------
+
+  
+  
+  output$profile_col <- renderUI({
+    req(!is.null(dati$var_ql))
+    pickerInput("profile_col", label = "Color variable",
+                choices = dati$var_ql,
+                options =  list(
+                  "max-options" = 1,
+                  "max-options-text" = "No more!"
+                ),
+                multiple = TRUE)
+  })
+  
+  
+  
+  
+  
+  
+  
+  
+  output$profile_plot <- renderPlot({
+    req(!is.null(dati$DS))
+    
+
+      
+      M_<-dati$DS[,dati$var_qt]
+      if(!is.null(input$var_y))M_ <- M_[,colnames(M_)!=input$var_y]
+      # ans[[4]] <- input$profile_col
+      
+      if(is.numeric(t(M_))){
+        if(is.null(input$profile_col)){
+          # dev.new(title="row profile")
+          matplot(y = t(M_),type = "l",lty=1,xlab="",ylab="")
+        }else{
+          grade<-dati$DS[,input$profile_col]
+          # grade<-variable$value 
+          if(!is.null(grade)){
+            tog<-typeof(grade)
+            if(is.factor(grade))tog<-"factor"
+            grade<-factor(grade)
+            lev<-levels(grade)
+            nl<-nlevels(grade)
+            if(tog=="double")vcolor<-unlist(dovc(as.numeric(lev)))
+            if(tog=="factor")vcolor<-unlist(dovc(as.character(lev)))
+            if(tog=="character")vcolor<-unlist(dovc(as.character(lev)))
+            if(tog=="integer")vcolor<-unlist(dovc(as.numeric(lev)))
+            
+            if(tog=="character" | tog=="factor"){
+              # dev.new(title="row profile")
+              matplot(y = t(M_),type = "l",lty=1,xlab="",ylab="",col=vcolor[grade])
+              legend("top", legend=lev,col=vcolor, cex=0.8,lty=1,ncol=min(length(lev),4),inset=c(0,-0.10),xpd=TRUE,bty = "n") 
+            }else{
+              # dev.new(title="row profile")
+              layout(mat=matrix(c(1,2),nrow=1),widths = c(8,0.9))
+              par(mar = c(4, 3, 4, 0))
+              matplot(y = t(M_),type = "l",lty=1,xlab="",ylab="",col=vcolor[grade])
+              par(mar = c(2, 2, 4, 2))
+              m<-as.numeric(lev)[order(as.numeric(lev),decreasing = FALSE)]
+              
+              
+              tl <- input$input$profile_col
+              # if(variable$control==1)tl=variable$input
+              # if(variable$control==2)tl=colnames(eval(parse(text=variable$name),envir=.GlobalEnv))[as.numeric(sub("]","",sub(".*\\[,", "", sub("[[:digit:]]+","",sub(":","",sub("[[:digit:]]+","", variable$surname))))))]
+              # if(variable$control==3)tl=colnames(eval(parse(text=variable$name),envir=.GlobalEnv))[as.numeric(sub("]","",sub(".*\\[,", "", variable$surname)))]
+              
+              image(y=m,z=t(m), col=vcolor,
+                    axes=FALSE, main=tl, cex.main=.8,ylab='')
+              axis(4,cex.axis=0.8,mgp=c(0,0.5,0))
+              
+              # rm(tl,m)
+            }
+
+          }
+        }
+        
+      }else{
+        #allert: 'The matrix contains alphanumeric data: this operation is not allowed'
+      }
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+  })
+  
+  
   
   
 
