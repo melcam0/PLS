@@ -85,7 +85,7 @@ server <- function (input , output, session ){
   
   observeEvent(input$openModal, {
     showModal(
-      modalDialog(title = "Autori:",size = 's',easyClose = TRUE,footer = NULL,
+      modalDialog(title = "Authors:",size = 's',easyClose = TRUE,footer = NULL,
                   
                   tags$img(src = base64enc::dataURI(file = "GC.jpg", mime = "image/jpg")),
                   
@@ -115,6 +115,7 @@ server <- function (input , output, session ){
     dati$var=NULL
     dati$var_nr=NULL
     dati$var_qt=NULL
+    dati$var_qt_tr=NULL
     dati$var_qt_sup=NULL
     dati$var_ql=NULL
     dati$righe=NULL
@@ -125,6 +126,8 @@ server <- function (input , output, session ){
     dati_ext$DS=NULL
     dati_ext$DS_nr=NULL
     dati_ext$nr=NULL
+    
+    trsf$testo=NULL
 
     PCA$res=NULL
     PCA$dataset=NULL
@@ -165,8 +168,10 @@ server <- function (input , output, session ){
 # reactiveValues ----------------------------------------------------------
   
   dati<-reactiveValues(DS=NULL,DS_nr=NULL,DS_righe=NULL,DS_tr=NULL,nr=NULL,var=NULL,var_nr=NULL,
-                       var_qt=NULL,var_qt_sup=NULL,var_ql=NULL,righe=NULL,righe_rest=NULL,righe_tolte=NULL,
+                       var_qt=NULL,var_qt_tr=NULL,var_qt_sup=NULL,var_ql=NULL,righe=NULL,righe_rest=NULL,righe_tolte=NULL,
                        var_gr=NULL)
+  
+  trsf <- reactiveValues(testo=NULL)
   
   dati_ext<-reactiveValues(DS=NULL,DS_nr=NULL,nr=NULL)
   
@@ -506,20 +511,20 @@ server <- function (input , output, session ){
   
   output$profile_plot <- renderPlot({
     req(!is.null(dati$DS))
-    
 
-      
+
+
       M_<-dati$DS[,dati$var_qt]
       if(!is.null(input$var_y))M_ <- M_[,colnames(M_)!=input$var_y]
       # ans[[4]] <- input$profile_col
-      
+
       if(is.numeric(t(M_))){
         if(is.null(input$profile_col)){
           # dev.new(title="row profile")
           matplot(y = t(M_),type = "l",lty=1,xlab="",ylab="")
         }else{
           grade<-dati$DS[,input$profile_col]
-          # grade<-variable$value 
+          # grade<-variable$value
           if(!is.null(grade)){
             tog<-typeof(grade)
             if(is.factor(grade))tog<-"factor"
@@ -530,11 +535,11 @@ server <- function (input , output, session ){
             if(tog=="factor")vcolor<-unlist(dovc(as.character(lev)))
             if(tog=="character")vcolor<-unlist(dovc(as.character(lev)))
             if(tog=="integer")vcolor<-unlist(dovc(as.numeric(lev)))
-            
+
             if(tog=="character" | tog=="factor"){
               # dev.new(title="row profile")
               matplot(y = t(M_),type = "l",lty=1,xlab="",ylab="",col=vcolor[grade])
-              legend("top", legend=lev,col=vcolor, cex=0.8,lty=1,ncol=min(length(lev),4),inset=c(0,-0.10),xpd=TRUE,bty = "n") 
+              legend("top", legend=lev,col=vcolor, cex=0.8,lty=1,ncol=min(length(lev),4),inset=c(0,-0.10),xpd=TRUE,bty = "n")
             }else{
               # dev.new(title="row profile")
               layout(mat=matrix(c(1,2),nrow=1),widths = c(8,0.9))
@@ -542,42 +547,142 @@ server <- function (input , output, session ){
               matplot(y = t(M_),type = "l",lty=1,xlab="",ylab="",col=vcolor[grade])
               par(mar = c(2, 2, 4, 2))
               m<-as.numeric(lev)[order(as.numeric(lev),decreasing = FALSE)]
-              
-              
+
+
               tl <- input$input$profile_col
               # if(variable$control==1)tl=variable$input
               # if(variable$control==2)tl=colnames(eval(parse(text=variable$name),envir=.GlobalEnv))[as.numeric(sub("]","",sub(".*\\[,", "", sub("[[:digit:]]+","",sub(":","",sub("[[:digit:]]+","", variable$surname))))))]
               # if(variable$control==3)tl=colnames(eval(parse(text=variable$name),envir=.GlobalEnv))[as.numeric(sub("]","",sub(".*\\[,", "", variable$surname)))]
-              
+
               image(y=m,z=t(m), col=vcolor,
                     axes=FALSE, main=tl, cex.main=.8,ylab='')
               axis(4,cex.axis=0.8,mgp=c(0,0.5,0))
-              
+
               # rm(tl,m)
             }
 
           }
         }
-        
+
       }else{
         #allert: 'The matrix contains alphanumeric data: this operation is not allowed'
       }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+
+
+
+
+
+
+
+
+
+
+
+
   })
   
   
+  
+  # counter <- reactiveValues(countervalue = 0)
+  
+  observeEvent(input$profile_transf,{
+ 
+    req(!is.null(dati$DS))
+    # if(counter$countervalue==1)dati$DS_tr <- dati$DS
+    if(is.null(dati$DS_tr))dati$DS_tr <- dati$DS
+    if(is.null(dati$var_qt_tr))dati$var_qt_tr <- dati$var_qt
+    # profile_transf_n$n=profile_transf_n$n + 1
+    # counter$countervalue <- counter$countervalue + 1
+    
+    
+    if(input$profile_transf=='Autoscaling (SNV)'){
+      # counter$countervalue <- counter$countervalue + 1 
+      M <- dati$DS[,dati$var_qt]
+      M_s <- dati$DS[,!colnames(dati$DS)%in%dati$var_qt]
+      if(!is.null(input$var_y)){
+        M <- M[,colnames(M)!=input$var_y]
+        M_s <- cbind.data.frame(M_s,dati$DS[,input$var_y])
+        colnames(M_s)[length(colnames(M_s))] <- input$var_y
+        
+      }
+      
+      
+      M<-t(M)
+      M<-scale(M,center=TRUE,scale=TRUE)
+      M<-t(M)
+      dati$DS <- cbind.data.frame(M_s,M)
+    
+    }
+    
+    
+    
+    
+    if(input$profile_transf=='First Derivative'){
+      # counter$countervalue <- counter$countervalue + 1 
+      M <- dati$DS[,dati$var_qt]
+      M_s <- dati$DS[,!colnames(dati$DS)%in%dati$var_qt]
+      if(!is.null(input$var_y)){
+        M <- M[,colnames(M)!=input$var_y]
+        M_s <- cbind.data.frame(M_s,dati$DS[,input$var_y])
+        colnames(M_s)[length(colnames(M_s))] <- input$var_y
+        
+      }
+      
+      
+      M<-t(M)
+      M<-diff(M,lag=1,differences=1)
+      M<-t(M)
+      dati$DS <- cbind.data.frame(M_s,M)
+      dati$var_qt <- dati$var_qt[dati$var_qt%in%colnames(dati$DS)]
+    }
+    
+    
+    if(input$profile_transf=='Second Derivative'){
+      # counter$countervalue <- counter$countervalue + 1 
+      M <- dati$DS[,dati$var_qt]
+      M_s <- dati$DS[,!colnames(dati$DS)%in%dati$var_qt]
+      if(!is.null(input$var_y)){
+        M <- M[,colnames(M)!=input$var_y]
+        M_s <- cbind.data.frame(M_s,dati$DS[,input$var_y])
+        colnames(M_s)[length(colnames(M_s))] <- input$var_y
+        
+      }
+      
+      
+      M<-t(M)
+      M<-diff(M,lag=1,differences=2)
+      M<-t(M)
+      dati$DS <- cbind.data.frame(M_s,M)
+      dati$var_qt <- dati$var_qt[dati$var_qt%in%colnames(dati$DS)]
+    }
+    
+    
+    trsf$testo <- paste(trsf$testo,'-',input$profile_transf, '-')
+    trsf <- input$profile_transf
+    # trsf$testo <-  counter$countervalue
+  })
+  
+  
+  output$profile_success_trasf <- renderPrint({
+    trsf$testo
+    # dati$DS
+    # dati$var_qt
+    # input$var_y
+  })
+  
+  observeEvent(input$profile_reset,{
+    dati$DS <- dati$DS_tr
+    trsf$testo=NULL
+    # input$profile_transf <- "None"
+    # counter$countervalue=0
+  })
+  
+  output$ds_tr_download <- downloadHandler(
+    filename = "data_tr.xlsx", 
+    content = function(file) {
+      write.xlsx(dati$DS, file,colNames=TRUE)
+    })
   
   
 

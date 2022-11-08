@@ -11,13 +11,7 @@ sidebar<- dashboardSidebar(
                   menuItem("Variables",tabName = "variabili"),
                   menuItem("Objects",tabName = "oggetti"),
                   menuItem("Show data",tabName = "vedi"),
-                  
-                  
-   
-                  
                   menuItem("Row profile",tabName = "profile"),
-                  
-                  
                   actionButton("reset","Delete",style='padding:4px; font-size:80%')
                   ),
                 
@@ -200,8 +194,10 @@ body<-dashboardBody(
       
       tabItem(tabName = "profile",
               fluidPage(titlePanel("Row profile"),
-                        column(8,
-                               plotOutput('profile_plot')),
+                        column(8
+                               ,
+                               plotOutput('profile_plot')
+                               ),
                         column(4,
                                uiOutput('profile_col'),
                                
@@ -229,7 +225,11 @@ body<-dashboardBody(
                            
                                
                                
-                               )
+                               ),
+                        column(12,
+                               h5('Subsequent transformations'),
+                               verbatimTextOutput('profile_success_trasf'),
+                               downloadButton("ds_tr_download"))
                         
                         
                         
