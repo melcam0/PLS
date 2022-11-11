@@ -128,31 +128,49 @@ server <- function (input , output, session ){
     dati_ext$nr=NULL
     
     trsf$testo=NULL
-
-    PCA$res=NULL
-    PCA$dataset=NULL
-    PCA$center=NULL
-    PCA$scale=NULL
-    PCA$centered=NULL
-    PCA$scaled=NULL
-    PCA$sgt=NULL
-    PCA$type=NULL
-    PCA$T2=NULL
-    PCA$Q=NULL
     
-    PCA$d_T2=NULL  
-    PCA$d_Q=NULL
-    PCA$c_T2=NULL
-    PCA$c_Q=NULL
+    PLS$res=NULL
+    PLS$resf=NULL
+    PLS$ncompo=NULL
+    PLS$typ=NULL
+    PLS$dataset<-NULL
+    PLS$nY<-NULL
+    PLS$validation<-NULL
+    PLS$nseg<-NULL
+    PLS$segtype<-NULL
+    PLS$scale<-NULL
+    PLS$model<-NULL
+    PLS$ncomp<-NULL
+    PLS$rmsep<-NULL
+    PLS$rcv<-NULL
+    PLS$res<-NULL
+    PLS$resf<-NULL
     
-    PCA$rnd=NULL
     
-    PCA_miss$res=NULL
-    PCA_miss$DS_rec=NULL
-    
-    PCA_ext$scores=NULL
-    PCA_ext$T2=NULL
-    PCA_ext$Q=NULL
+    # PCA$res=NULL
+    # PCA$dataset=NULL
+    # PCA$center=NULL
+    # PCA$scale=NULL
+    # PCA$centered=NULL
+    # PCA$scaled=NULL
+    # PCA$sgt=NULL
+    # PCA$type=NULL
+    # PCA$T2=NULL
+    # PCA$Q=NULL
+    # 
+    # PCA$d_T2=NULL  
+    # PCA$d_Q=NULL
+    # PCA$c_T2=NULL
+    # PCA$c_Q=NULL
+    # 
+    # PCA$rnd=NULL
+    # 
+    # PCA_miss$res=NULL
+    # PCA_miss$DS_rec=NULL
+    # 
+    # PCA_ext$scores=NULL
+    # PCA_ext$T2=NULL
+    # PCA_ext$Q=NULL
     
     graf$xlim=NULL
     graf$xylim=NULL
@@ -175,8 +193,11 @@ server <- function (input , output, session ){
   
   dati_ext<-reactiveValues(DS=NULL,DS_nr=NULL,nr=NULL)
   
-  PCA <- reactiveValues(res=NULL,dataset=NULL,center=NULL,scale=NULL,centered=NULL,scaled=NULL,sgt=NULL,type=NULL,
-                        T2=NULL,Q=NULL,d_T2=NULL,d_Q=NULL,c_T2=NULL,c_Q=NULL,rnd=NULL)
+  PLS <- reactiveValues(res=NULL,resf=NULL,ncompo=NULL,typ=NULL,dataset=NULL,nY=NULL,validation=NULL,nseg=NULL,segtype=NULL,scale=NULL,model=NULL,
+                        ncomp=NULL,rmsep=NULL,rcv=NULL)
+  
+  # PCA <- reactiveValues(res=NULL,dataset=NULL,center=NULL,scale=NULL,centered=NULL,scaled=NULL,sgt=NULL,type=NULL,
+  #                       T2=NULL,Q=NULL,d_T2=NULL,d_Q=NULL,c_T2=NULL,c_Q=NULL,rnd=NULL)
   PCA_miss<-reactiveValues(res=NULL,DS_rec=NULL)
   PCA_ext <- reactiveValues(scores=NULL,T2=NULL,Q=NULL)
 
@@ -686,161 +707,170 @@ server <- function (input , output, session ){
   
   
 
-# PCA ---------------------------------------------------------------------
+# PLS ---------------------------------------------------------------------
 
-# PCA - modello -----------------------------------------------------------
+# PLS - modello single CV -------------------------------------------------
 
   output$n_comp<-renderUI({
     req(dati$var_qt)
-    selectInput("n_comp", label = "Max. number of pricipal components", 
+    selectInput("n_comp", label = "Max. number of components", 
                 choices = c(2:length(dati$var_qt)), 
-                selected = length(dati$var_qt))
+                selected = 10)
       })
   
-  output$n_comp_varmax<-renderUI({
-    req(dati$var_qt)
-    req(input$pca_type=='varmax')
-    selectInput("n_comp_varmax", label = "N° comp. varimax", 
-                choices = c(2:input$n_comp), 
-                selected = 1)
+  output$n_cv<-renderUI({
+    req(!is.null(dati$DS))
+    selectInput("n_cv", label = "Number of segments for CV", 
+                choices = c(2:nrow(dati$DS)), 
+                selected = 5)
   })
- 
   
-  observeEvent(input$bpcamodel,{
-    validate(need(nrow(dati$DS)!=0,""))
-    if(sum(apply(dati$DS[,dati$var_qt],2,'is.numeric'))!=ncol(dati$DS[,dati$var_qt])){
-        sendSweetAlert(session, title = "Input Error",
-                       text = 'Le variabili qualitative devono essere selezionate come supplementari!',
-                       type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
+  
+  
+  
+  
+  
+
+
+  #modello
+  observeEvent(input$bplsmodel,{
+
+
+# 
+#     ######
+   validate(need(nrow(dati$DS)!=0,""))
+#     validate(need(!in.null(dati$DS)),"")
+    if(is.null(input$var_y)){
+      sendSweetAlert(session, title = "Input Error",
+                     text = 'Select responce variable!',
+                     type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
     }else{
-      require(pcaMethods)
-      ans <- list()
-      ans[[2]] <- 'all';ans[[3]] <- 'all'
-      ans[[4]] <- input$n_comp
-      ans[[5]] <- input$pca_center
-      ans[[6]] <- input$pca_scale
 
-      M_ <- as.data.frame(dati$DS[,dati$var_qt])
-
+      M_<-dati$DS[,dati$var_qt]
+      if(!is.null(input$var_y))M_ <- M_[,colnames(M_)!=input$var_y]
+      Y_ <- dati$DS[,input$var_y]
       if((typeof(M_)=='double')|(typeof(M_)=='list')){
+
+
+
+        M_<-data.frame(cbind(Y_,data.frame(M_)))
+        naM<-names(M_)
         nNA<-sum(is.na(M_))
+        nY<-1
         if(nNA>0){
-          mess<-paste(
-            as.character(nNA),
-            'missing data present - This is a WARNING message, not an error message')
-          showNotification(mess)}
+          mess<-paste(as.character(nNA),'NA present.We try to rebuild them!')
+          showNotification(mess)
 
-        ncom<-as.numeric(ans[[4]])
 
-        validate(need(!(ncom>ncol(M_))|(ncom<1),'Wrong component number !'))
+          md<-prep(M_,scale="uv",center=TRUE,simple=FALSE,rev=FALSE)
+          res<-pca(md$data,method="nipals",nPcs=min(ncol(M_),10),scale="uv",center=TRUE)
+          M_<-prep(res@completeObs,scale=md$scale,center=md$center,reverse=TRUE)
+          M_<-as.data.frame(M_)
 
-        sgt<-as.integer(ans[[4]])
-        if(!ans[[6]])sgt<-sum(apply(M_,2,var))
-        ccs<-'none';if(ans[[6]])ccs<-'uv'
-        md<-prep(M_,scale=ccs,center=ans[[5]],simple=FALSE,rev=FALSE)
-        res<-pca(md$data,method="nipals",nPcs=as.numeric(ans[[4]]),scale=ccs,center=ans[[5]])
 
-        PCA$res<-res
-        PCA$dataset<-prep(PCA$res@completeObs,scale=md$scale,center=md$center,reverse=TRUE)
-        PCA$dataset<-as.data.frame(PCA$dataset)
-        PCA$center<-ans[[5]]
-        PCA$scale<-ans[[6]]
-        PCA$centered<-md$center
-        PCA$scaled<-md$scale
-        PCA$sgt<-sgt
-        PCA$type<-'pca'
 
-        if(input$pca_type=='varmax'){
-          ncomp <- as.numeric(input$n_comp_varmax)
-          prl<-t(PCA$res@loadings[,1:ncomp])
-          go<-1
-          while(go==1){
-            for(i in 1:(as.numeric(ncomp)-1)){
-              for(j in (i+1):ncomp){
-                lo<-prl[c(i,j),]
-                rotb<-0
-                sim<-sum(lo^4)
-                simmax<-sim
-                for (rot in seq(-90,90,0.1)){
-                  rm<-c(cos(rot*pi/180),-sin(rot*pi/180),sin(rot*pi/180),cos(rot*pi/180))
-                  rm<-matrix(rm,2,2)
-                  lo2<-rm%*%lo
-                  sim2<-sum(lo2^4)
-                  if(sim2>simmax){
-                    lob<-lo2
-                    simmax<-sim2
-                    rotb<-rot}}
-                if(rotb!=0){
-                  go<-1
-                  prl[i,]<-lob[1,]
-                  prl[j,]<-lob[2,]}else{go<-0}
-              }
-            }
-          }
-
-          prs<-PCA$res@completeObs%*%t(prl)
-          vp<-apply(prs^2,2,sum)/sum(apply(PCA$res@completeObs^2,2,sum))
-          ivp<-sort(vp,decreasing=TRUE,index.return=TRUE)$ix
-          vp<-sort(vp,decreasing=TRUE,index.return=TRUE)$x
-          PCA$res@loadings<-PCA$res@loadings[,1:ncomp]
-          PCA$res@scores<-PCA$res@scores[,1:ncomp]
-          name.pca<-colnames(PCA$res@loadings)
-          PCA$res@loadings<-t(prl[ivp,])
-          PCA$res@scores<-prs[,ivp]
-          name.pca<-gsub("PC", "Factor ", name.pca)
-          colnames(PCA$res@loadings)<-name.pca
-          colnames(PCA$res@scores)<-name.pca
-          names(vp)<-name.pca
-          PCA$res@nPcs<-ncomp
-          PCA$res@R2<-vp
-          PCA$res@sDev<-sqrt(PCA$res@R2)
-          PCA$res@R2cum<-cumsum(PCA$res@R2)
-          PCA$type<-'varimax'
         }
+
+
+
+
+
+        ncompo<-min(as.numeric(input$n_comp),ncol(M_)-1)
+        model<-paste(naM[nY],'~',(paste(naM[-nY],collapse='+')),sep='')
+        res<-plsr(as.formula(model),ncomp=ncompo,data=M_,segment.type="interleaved",
+                  validation='CV',segments=as.numeric(input$n_cv),scale=as.logical(input$pls_scale))
+        resf<-plsr(as.formula(model),ncomp=ncompo,data=M_,validation='none',
+                   scale=as.logical(input$pls_scale))
+
+
+
+        PLS$res <- res
+        PLS$resf <- resf
+        PLS$ncompo <- ncompo
+        PLS$ncompo
+        PLS$typ<-'PLS1'
+        PLS$nY<-nY
+        PLS$validation<-'CV'
+        PLS$nseg<-as.numeric(input$n_cv)
+        PLS$segtype<-'interleaved'
+        PLS$scale<-as.logical(input$pls_scale)
+        PLS$model<-as.formula(model)
+
+
+
+      }else{
+        sendSweetAlert(session, title = "Input Error",
+                       text = 'Matrix/Table Requested!',
+                       type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
       }
+
+
     }
+
     })
-
+# 
 output$model_out <- renderPrint({
-  validate(need(nrow(dati$DS)!=0,"Caricare un dataset!"))
-  validate(need(!is.null(PCA$res),"Eseguire il modello!"))
-  V<-data.frame(PCA$res@R2,PCA$res@R2cum)
-  colnames(V)<-c('% Var.expl.','% Var. cum. expl.')
-  rownames(V)<-attr(PCA$res@sDev,'names')
-  round(t(V*100),2)
+  validate(need(nrow(dati$DS)!=0,"Load a dataset!"))
+  validate(need(!is.null(PLS$res),"Execute the model!"))
+
+  vm<-R2(PLS$res,estimate='CV',ncomp=1:PLS$ncompo,intercept=FALSE)$val[1,,]*100
+  rmsep<-RMSEP(PLS$res,intercep=FALSE)
+
+  cat(' ',"\n")
+  cat('CV% Explained Variance',"\n")
+  print(round(vm,2))
+  cat(' ',"\n")
+  cat('RMSECV',"\n")
+  print(format(rmsep$val[1,,],digit=4))
+  cat(' ',"\n")
+  cat(paste('Minimum RMSECV at component n.',which.min(rmsep$val[1,,])),"\n")
+
 })
 
-output$pca_expvar_dwl <- downloadHandler(
-  filename = "expl_variance.xlsx", 
-  content = function(file) {
-    df<-rbind.data.frame(PCA$res@sDev^2,PCA$res@R2*100,PCA$res@R2cum*100)
-    colnames(df)<-attr(PCA$res@sDev^2,'names')
-    df <- cbind.data.frame(' '= c('expvar','percexpvar','cpercexpvar'),df)
-    write.xlsx(df, file,colNames=TRUE)
-  })
 
-output$pca_var_type<-renderUI({
-  req(!is.null(PCA$res))
-  radioButtons("pca_var_type", "Plot",choices = c(Scree = "scree", Cumulative= "cum"), selected = "scree", inline=TRUE)
-})
 
-output$scree_plot<-renderPlot({
-  
-  req(!is.null(PCA$res))
-  req(input$pca_var_type)
 
-  require(ggplot2)
-  df<-data.frame(x=1:PCA$res@nPcs, y=PCA$res@R2*100)
-  if(input$pca_var_type=="scree")gg<-ggplot(df, aes(x, y))+ggtitle("% Explained Variance")
-  if(input$pca_var_type=="cum")gg<-ggplot(df, aes(x, y=cumsum(y)))+ggtitle("Cumulative Explained Variance")
-  gg<- gg+ geom_point(colour='red', size = 2)+geom_line(colour='blue')+theme_light()
-  # gg<- gg+ scale_x_continuous(breaks = function(x) unique(floor(pretty(seq(0, (max(x) + 1) * 1.1)))))
-  gg<- gg+ scale_x_continuous(breaks = 1:PCA$res@nPcs)
-  gg<- gg+ xlab("Component Number")
-  gg<- gg+ ylab("% Explained Variance")
-  # girafe(code = print(gg))
-  gg <- gg+theme(aspect.ratio=1,axis.text = element_text(size = 10),axis.title = element_text(size = 15))
-  print(gg)
+
+
+
+
+
+
+
+# 
+# 
+# 
+# 
+# output$pca_expvar_dwl <- downloadHandler(
+#   filename = "expl_variance.xlsx", 
+#   content = function(file) {
+#     df<-rbind.data.frame(PCA$res@sDev^2,PCA$res@R2*100,PCA$res@R2cum*100)
+#     colnames(df)<-attr(PCA$res@sDev^2,'names')
+#     df <- cbind.data.frame(' '= c('expvar','percexpvar','cpercexpvar'),df)
+#     write.xlsx(df, file,colNames=TRUE)
+#   })
+# 
+# output$pca_var_type<-renderUI({
+#   req(!is.null(PCA$res))
+#   radioButtons("pca_var_type", "Plot",choices = c(Scree = "scree", Cumulative= "cum"), selected = "scree", inline=TRUE)
+# })
+# 
+output$cv_plot<-renderPlot({
+
+  req(!is.null(PLS$res))
+  # req(input$pca_var_type)
+  vm<-R2(PLS$res,estimate='CV',ncomp=1:PLS$ncompo,intercept=FALSE)$val[1,,]*100
+  rmsep<-RMSEP(PLS$res,intercep=FALSE)
+
+  # rmsep<-RMSEP(res,intercep=FALSE)
+  # dev.new(title="PLS RMSCV and explained variance")
+  op<-par(pty='s',mfrow=c(1,2))
+  plot(rmsep$val[1,,],xlab='Number of Components',ylab='RMSECV',main='');grid()
+  lines(rmsep$val[1,,])
+  vm<-R2(PLS$res,estimate='CV',ncomp=1:PLS$ncompo,intercept=FALSE)$val[1,,]*100
+  plot(vm,xlab='Number of Components',ylab='CV % Explained Variance',ylim=c(min(0,min(vm)),100));grid()#
+  lines(vm)
+  par(op)
 })
 
 

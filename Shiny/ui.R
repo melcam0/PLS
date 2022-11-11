@@ -17,32 +17,57 @@ sidebar<- dashboardSidebar(
                 
                 
                 
+                menuItem(text = "Model computation",icon = shiny::icon("expand-arrows-alt"),
+                         menuItem("PCR",tabName = "pcr",
+                                  menuItem("single CV",tabName = "pcr_CV"),
+                                  menuItem("repeated CV",tabName = "pcr_r_cv"),
+                                  menuItem("permutation test",tabName = "pcr_permtation")),
+                         menuItem("PLS",tabName = "pls",
+                                  menuItem("single CV",tabName = "pls_CV"),
+                                  menuItem("repeated CV",tabName = "ppls_r_cv"),
+                                  menuItem("permutation test",tabName = "pls_permtation"))),
                 
                 
                 
-                
-                menuItem(text = "PCA",icon = shiny::icon("expand-arrows-alt"),
-                  menuItem("Model computation",tabName = "modello"),
-                  menuItem("Missing data recostruction",tabName = "dati_mancanti"),
-                  menuItem("Randomization Test",tabName = "rnd_test"),
+                # menuItem(text = "PCA",icon = shiny::icon("expand-arrows-alt"),
+                #   menuItem("Model computation",tabName = "modello"),
+                #   menuItem("Missing data recostruction",tabName = "dati_mancanti"),
+                #   menuItem("Randomization Test",tabName = "rnd_test"),
                   hr(),
-                  menuItem("Plots",tabName = "grafici",
-                           menuItem('Score plot',tabName = 'scores'),
-                           menuItem('Loading plot',tabName = 'loadings'),
-                           menuItem('Biplot',tabName = 'biplot'),
-                           menuItem('Correlation plot',tabName = 'correlation'),
-                           menuItem('Var. of each variable explained',tabName = 'var_variable')),
-                  menuItem('Diagnostics',
-                           menuItem(HTML('T <sup>2</sup> and/vs Q'),tabName = 't2andq'),
-                           # menuItem('T^2 vs. Q (Influence Plot)',tabName='t2vsq'),
-                           menuItem(HTML('T <sup>2</sup> Contribution Plot'),tabName = 't2contr'),
-                           menuItem('Q Contribution Plot',tabName = 'qcontr')),
-                  menuItem('External data set',
-                           menuItem('Projection on the training set',tabName='ext_prj'),
-                           menuItem(HTML('T <sup>2</sup> vs. Q (Influence Plot)'),tabName = 'ext_t2andq'),
-                           menuItem(HTML('T <sup>2</sup> Contribution Plot'),tabName = 'ext_t2contr'),
-                           menuItem('Q Contribution Plot',tabName = 'ext_qcontr'))
-                ),
+                menuItem("Experimentals vs Calculated",tabName = "exp_calc"),
+                
+                menuItem("Residuals",tabName = "res"),
+                menuItem("Scores",tabName = "scores"),
+                menuItem("Loadings",tabName = "load"),
+                menuItem("Biplot",tabName = "biplot"),
+                menuItem("Coefficients",tabName = "coeff"),
+                menuItem("Prediction",tabName = "pred"),
+                
+                
+                #   menuItem("Plots",tabName = "grafici",
+                #            menuItem('Score plot',tabName = 'scores',
+                #                     menuItem('Score plot',tabName = 'scores')),
+                #            menuItem('Loading plot',tabName = 'loadings'),
+                #            menuItem('Biplot',tabName = 'biplot'),
+                #            menuItem('Correlation plot',tabName = 'correlation'),
+                #            menuItem('Var. of each variable explained',tabName = 'var_variable')),
+                #   menuItem('Diagnostics',
+                #            menuItem(HTML('T <sup>2</sup> and/vs Q'),tabName = 't2andq'),
+                #            # menuItem('T^2 vs. Q (Influence Plot)',tabName='t2vsq'),
+                #            menuItem(HTML('T <sup>2</sup> Contribution Plot'),tabName = 't2contr'),
+                #            menuItem('Q Contribution Plot',tabName = 'qcontr')),
+                #   menuItem('External data set',
+                #            menuItem('Projection on the training set',tabName='ext_prj'),
+                #            menuItem(HTML('T <sup>2</sup> vs. Q (Influence Plot)'),tabName = 'ext_t2andq'),
+                #            menuItem(HTML('T <sup>2</sup> Contribution Plot'),tabName = 'ext_t2contr'),
+                #            menuItem('Q Contribution Plot',tabName = 'ext_qcontr'))
+                # ),
+                # 
+    
+    
+    
+    
+    
                 hr(),
                 menuItem(text = "File",icon = icon("briefcase", lib = "font-awesome"),
                          # menuSubItem("Dispensa",tabName = "dispensa"),
@@ -236,35 +261,43 @@ body<-dashboardBody(
                         
                         )), 
       
-# PCA -------------------------------------------------------------------    
+# PLS -------------------------------------------------------------------    
 
-# PCA - modello -----------------------------------------------------------
+# PLS - modello single CV-----------------------------------------------------------
 
-      tabItem(tabName = "modello",
-              fluidPage(titlePanel("Model computation"),
+      tabItem(tabName = "pls_CV",
+              fluidPage(titlePanel("Model computation: PLS single CV"),
+
+                        column(4,
+                               checkboxInput("pls_scale", label = "Scale (centering by default)", value = TRUE)),
+                        column(4,
+                               uiOutput('n_comp')),
+                        column(4,
+                               uiOutput('n_cv')),
                         column(12,
-                               radioButtons("pca_type", " ",
-                                            choices = c(PCA = "pca", Varimax= "varmax"), selected = "pca", inline=TRUE)),
-                        column(4,
-                               checkboxInput("pca_center", label = "Center", value = TRUE)),
-                        column(4,
-                               checkboxInput("pca_scale", label = "Scale", value = TRUE)),
-                        column(4,
-                               uiOutput('n_comp'),
-                               uiOutput('n_comp_varmax')),
+                               actionButton("bplsmodel", label = "Execute")),
                         column(12,
-                               actionButton("bpcamodel", label = "Execute")),
-                        column(12,hr()),
-                        column(8,
-                               plotOutput('scree_plot',height = "600px")),
-                        column(4,
-                               uiOutput('pca_var_type')),
+                               hr()),
+
+
+
+
+
+
+                        column(12,
+                               plotOutput('cv_plot',height = "600px")),
+                        # column(4,
+                        #        uiOutput('pca_var_type')),
                         column(12,
                                br()),
+                        
+                        # 
                         column(12,
-                               verbatimTextOutput('model_out'),
-                               downloadButton("pca_expvar_dwl")),
-                        )),
+                               verbatimTextOutput('model_out')
+                               ),
+                        )
+              
+              ),
 
 
 # PCA - missing data reconstruction ---------------------------------------

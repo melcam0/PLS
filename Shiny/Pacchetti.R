@@ -7,11 +7,12 @@ pacchetti<-c('shiny',
              'readxl',
              'openxlsx',
              'BiocManager',
-             'lattice',
-             'latticeExtra',
-             'stringr',
-             'chemometrics',
-             'DT')
+             # 'lattice',
+             # 'latticeExtra',
+             # 'stringr',
+             # 'chemometrics',
+             'pls',
+             'gplots')
 
 install.packages(pkgs = pacchetti)
 
