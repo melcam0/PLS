@@ -593,21 +593,31 @@ server <- function (input , output, session ){
 
 # PLS ---------------------------------------------------------------------
 
-# PLS - modello single CV -------------------------------------------------
+# PLS - costruzione modello -------------------------------------------------
 
-  output$n_comp<-renderUI({
+  output$pls_n_comp<-renderUI({
     req(dati$var_qt)
-    selectInput("n_comp", label = "Max. number of components", 
+    selectInput("pls_n_comp", label = "Max. number of components", 
                 choices = c(2:length(dati$var_qt)), 
                 selected = 10)
       })
   
-  output$n_cv<-renderUI({
+  output$pls_n_cv<-renderUI({
     req(!is.null(dati$DS))
-    selectInput("n_cv", label = "Number of segments for CV", 
+    selectInput("pls_n_cv", label = "Number of segments for CV", 
                 choices = c(2:nrow(dati$DS)), 
                 selected = 5)
   })
+  
+  output$pls_n_rnd<-renderUI({
+    req(!is.null(dati$DS))
+    req(input$pls_cv_choise=="2")
+    selectInput("pls_n_rnd", label = "Number of randomizations", 
+                choices = c(1:1000), 
+                selected = 100)
+  })
+  
+
 
   observeEvent(input$bplsmodel,{
    validate(need(nrow(dati$DS)!=0,""))
@@ -616,10 +626,19 @@ server <- function (input , output, session ){
                      text = 'Select responce variable!',
                      type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
     }else{
+      
+      
+      
+      
+      
+      
       M_<-dati$DS[,dati$var_qt]
       if(!is.null(input$var_y))M_ <- M_[,colnames(M_)!=input$var_y]
       Y_ <- dati$DS[,input$var_y]
       if((typeof(M_)=='double')|(typeof(M_)=='list')){
+        
+        
+        
         M_<-data.frame(cbind(Y_,data.frame(M_)))
         naM<-names(M_)
         nNA<-sum(is.na(M_))
@@ -632,10 +651,13 @@ server <- function (input , output, session ){
           M_<-prep(res@completeObs,scale=md$scale,center=md$center,reverse=TRUE)
           M_<-as.data.frame(M_)
         }
-        ncompo<-min(as.numeric(input$n_comp),ncol(M_)-1)
+        # M._<-M_  # ????
+        ncompo<-min(as.numeric(input$pls_n_comp),ncol(M_)-1)
         model<-paste(naM[nY],'~',(paste(naM[-nY],collapse='+')),sep='')
+        
+        
         res<-plsr(as.formula(model),ncomp=ncompo,data=M_,segment.type="interleaved",
-                  validation='CV',segments=as.numeric(input$n_cv),scale=as.logical(input$pls_scale))
+                  validation='CV',segments=as.numeric(input$pls_n_cv),scale=as.logical(input$pls_scale))
         resf<-plsr(as.formula(model),ncomp=ncompo,data=M_,validation='none',
                    scale=as.logical(input$pls_scale))
         PLS$res <- res
@@ -649,7 +671,66 @@ server <- function (input , output, session ){
         PLS$segtype<-'interleaved'
         # PLS$scale<-as.logical(input$pls_scale)
         PLS$model<-as.formula(model)
-      }else{
+        
+        # if(input$pls_cv_choise=="1"){
+        #   res<-plsr(as.formula(model),ncomp=ncompo,data=M_,segment.type="interleaved",
+        #             validation='CV',segments=as.numeric(input$n_cv),scale=as.logical(input$pls_scale))
+        #   resf<-plsr(as.formula(model),ncomp=ncompo,data=M_,validation='none',
+        #              scale=as.logical(input$pls_scale))
+        #   PLS$res <- res
+        #   PLS$resf <- resf
+        #   # PLS$ncompo <- ncompo
+        #   PLS$typ<-'PLS1'
+        #   PLS$dataset<-M_
+        #   PLS$nY<-nY
+        #   PLS$validation<-'CV'
+        #   # PLS$nseg<-as.numeric(input$n_cv)
+        #   PLS$segtype<-'interleaved'
+        #   # PLS$scale<-as.logical(input$pls_scale)
+        #   PLS$model<-as.formula(model)
+        # }
+        
+        if(input$pls_cv_choise=="2"){
+          N<-c(NULL)
+          D<-data.frame(NULL)
+          withProgress(message = 'Reapeated CV:',value = 0, {
+            n <- as.numeric(input$pls_n_rnd)
+            for(i in 1:n){
+              incProgress(detail = paste("times", i),amount = 1/n)
+              a=as.numeric(Sys.time())
+              set.seed(a)
+              M_=M_[sample(nrow(M_)),]
+              M_<-as.data.frame(M_)
+              res<-plsr(as.formula(model),ncomp=ncompo,data=M_,segment.type="interleaved",
+                        validation='CV',segments=as.numeric(input$pls_n_cv),scale=as.logical(input$pls_scale))
+              # resf<-plsr(as.formula(model),ncomp=ncompo,data=M_,validation='none',
+              # scale=as.logical(ans[[7]]))
+              rmsep<-RMSEP(res,intercep=FALSE)
+              N[i]<-which.min(rmsep$val[1,,])
+              D<-rbind.data.frame(D,rmsep$val[1,,])
+            }
+            
+          })
+          
+          
+          colnames(D)<-paste('Comp',c(1:ncompo))
+          D<-cbind.data.frame(N=N,D)
+          # D_min<-apply(D[,-1],2,min)
+          # D_max<-apply(D[,-1],2,max)
+
+          R_sq<-1-apply(D[,-1]^2,2,mean)*length(Y_)/sum((Y_ - mean(Y_))^2)
+
+          PLS$R_sq <- R_sq
+          PLS$D <- D
+          
+        }
+        
+        
+ 
+      
+        
+        
+        }else{
         sendSweetAlert(session, title = "Input Error",
                        text = 'Matrix/Table Requested!',
                        type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
@@ -657,10 +738,13 @@ server <- function (input , output, session ){
     }
     })
 
-output$model_out <- renderPrint({
+#   
+#   # da sistemare in 2 renderprint con req(=='1) e req(00?2y)
+output$model_out_1 <- renderPrint({
   validate(need(nrow(dati$DS)!=0,"Load a dataset!"))
   validate(need(!is.null(PLS$res),"Execute the model!"))
-  vm<-R2(PLS$res,estimate='CV',ncomp=1:input$n_comp,intercept=FALSE)$val[1,,]*100
+  req(input$pls_cv_choise=="1")
+  vm<-R2(PLS$res,estimate='CV',ncomp=1:input$pls_n_comp,intercept=FALSE)$val[1,,]*100
   rmsep<-RMSEP(PLS$res,intercep=FALSE)
   cat(' ',"\n")
   cat('CV% Explained Variance',"\n")
@@ -670,49 +754,69 @@ output$model_out <- renderPrint({
   print(round(rmsep$val[1,,],4))
   cat(' ',"\n")
   cat(paste('Minimum RMSECV at component n.',which.min(rmsep$val[1,,])),"\n")
+
 })
 
-output$n_comp_df<-renderUI({
-  req(!is.null(PLS$res))
-  rmsep<-RMSEP(PLS$res,intercep=FALSE)
-  selectInput("n_comp_df", label = "Number of components", 
-              choices = c(2:length(dati$var_qt)), 
-              selected = which.min(rmsep$val[1,,]))
+output$model_out_2 <- renderPrint({
+  validate(need(nrow(dati$DS)!=0,"Load a dataset!"))
+  validate(need(!is.null(PLS$res),"Execute the model!"))
+  req(input$pls_cv_choise=="2")
+  req(!is.null(PLS$D))
+  cat(' ',"\n")
+  cat('CV% Explained Variance',"\n")
+  print(round(PLS$R_sq*100,2),quote=FALSE)
+  #   print(round(vm,2))
+  cat(' ',"\n")
+  cat('Global RMSECV',"\n")
+  print(round(sqrt(apply(PLS$D^2,2,mean))[-1],4))
+  #   print(round(rmsep$val[1,,],4))
+  cat(' ',"\n")
+  cat(paste('Minimum Global RMSECV at component n.',which.min(sqrt(apply(PLS$D^2,2,mean))[-1])))
+  
+  
 })
 
-output$bplsmodel_df <- renderUI({
-  req(!is.null(PLS$res))
-  actionButton("bplsmodel_df", label = "Create model")
-})
-
-observeEvent(input$bplsmodel_df,{
-  req(!is.null(PLS$res))
-  # PLS$ncomp_df<-as.numeric(input$n_comp_df)
-  res<-plsr(PLS$model,ncomp=as.numeric(input$n_comp_df),data=PLS$dataset,segment.type="interleaved",
-            validation='CV',segments=as.numeric(input$n_cv),scale=input$pls_scale)
-  PLS$rmsep_df<-RMSEP(res,estimate='CV',ncomp=as.numeric(input$n_comp_df),intercept=FALSE)$val[1,,]
-  PLS$rcv_df<-R2(res,estimate='CV',ncomp=as.numeric(input$n_comp_df),intercept=FALSE)$val[1,,]*100
-  PLS$res_df<-res
-  plsdf$testo <- paste('Model created with ',format(as.numeric(input$n_comp_df),digits=2),
-                                   ' components',sep='')
-})
-
-output$model_out_df <- renderPrint({
-  cat(plsdf$testo)
-})
-
-output$cv_plot<-renderPlot({
-  req(!is.null(PLS$res))
-  vm<-R2(PLS$res,estimate='CV',ncomp=1:input$n_comp,intercept=FALSE)$val[1,,]*100
-  rmsep<-RMSEP(PLS$res,intercep=FALSE)
-  op<-par(pty='s',mfrow=c(1,2))
-  plot(rmsep$val[1,,],xlab='Number of Components',ylab='RMSECV',main='');grid()
-  lines(rmsep$val[1,,])
-  vm<-R2(PLS$res,estimate='CV',ncomp=1:input$n_comp,intercept=FALSE)$val[1,,]*100
-  plot(vm,xlab='Number of Components',ylab='CV % Explained Variance',ylim=c(min(0,min(vm)),100));grid()#
-  lines(vm)
-  par(op)
-})
+# output$n_comp_df<-renderUI({
+#   req(!is.null(PLS$res))
+#   rmsep<-RMSEP(PLS$res,intercep=FALSE)
+#   selectInput("n_comp_df", label = "Number of components",
+#               choices = c(2:length(dati$var_qt)),
+#               selected = which.min(rmsep$val[1,,]))
+# })
+# 
+# output$bplsmodel_df <- renderUI({
+#   req(!is.null(PLS$res))
+#   actionButton("bplsmodel_df", label = "Create model")
+# })
+# 
+# observeEvent(input$bplsmodel_df,{
+#   req(!is.null(PLS$res))
+#   # PLS$ncomp_df<-as.numeric(input$n_comp_df)
+#   res<-plsr(PLS$model,ncomp=as.numeric(input$n_comp_df),data=PLS$dataset,segment.type="interleaved",
+#             validation='CV',segments=as.numeric(input$n_cv),scale=input$pls_scale)
+#   PLS$rmsep_df<-RMSEP(res,estimate='CV',ncomp=as.numeric(input$n_comp_df),intercept=FALSE)$val[1,,]
+#   PLS$rcv_df<-R2(res,estimate='CV',ncomp=as.numeric(input$n_comp_df),intercept=FALSE)$val[1,,]*100
+#   PLS$res_df<-res
+#   plsdf$testo <- paste('Model created with ',format(as.numeric(input$n_comp_df),digits=2),
+#                                    ' components',sep='')
+# })
+# 
+# output$model_out_df <- renderPrint({
+#   cat(plsdf$testo)
+# })
+# 
+# output$cv_plot<-renderPlot({
+#   req(!is.null(PLS$res))
+#   vm<-R2(PLS$res,estimate='CV',ncomp=1:input$n_comp,intercept=FALSE)$val[1,,]*100
+#   rmsep<-RMSEP(PLS$res,intercep=FALSE)
+#   op<-par(pty='s',mfrow=c(1,2))
+#   plot(rmsep$val[1,,],xlab='Number of Components',ylab='RMSECV',main='');grid()
+#   lines(rmsep$val[1,,])
+#   vm<-R2(PLS$res,estimate='CV',ncomp=1:input$n_comp,intercept=FALSE)$val[1,,]*100
+#   plot(vm,xlab='Number of Components',ylab='CV % Explained Variance',ylim=c(min(0,min(vm)),100));grid()#
+#   lines(vm)
+#   par(op)
+# })
 
 
 # PLS - CV ripetuto -------------------------------------------------------

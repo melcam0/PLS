@@ -14,16 +14,30 @@ sidebar<- dashboardSidebar(
                   menuItem("Row profile",tabName = "profile"),
                   actionButton("reset","Delete",style='padding:4px; font-size:80%')
                   ),
-                menuItem(text = "Model computation",icon = shiny::icon("expand-arrows-alt"),
-                         menuItem("PCR",tabName = "pcr",
-                                  menuItem("single CV",tabName = "pcr_CV"),
-                                  menuItem("repeated CV",tabName = "pcr_r_CV"),
-                                  menuItem("permutation test",tabName = "pcr_permtation")),
-                         menuItem("PLS",tabName = "pls",
-                                  menuItem("single CV",tabName = "pls_CV"),
-                                  menuItem("repeated CV",tabName = "pls_r_CV"),
-                                  menuItem("permutation test",tabName = "pls_permtation"))),
-                  hr(),
+                menuItem(text = "PCR",icon = shiny::icon("expand-arrows-alt"),
+                         menuItem("Model computation",tabName = "pcr_CV"),
+                         menuItem("Permutation test",tabName = "pcr_permtation")),
+                
+                menuItem(text = "PLS",icon = shiny::icon("expand-arrows-alt"),
+                         menuItem("Model computation",tabName = "pls_CV"),
+                         menuItem("permutation test",tabName = "pls_permtation")),
+                         
+                #          
+                #          
+                # # menuItem(text = "Model computation",icon = shiny::icon("expand-arrows-alt"),
+                #          menuItem("PCR",tabName = "pcr",
+                #                   menuItem("single CV",tabName = "pcr_CV"),
+                #                   # menuItem("repeated CV",tabName = "pcr_r_CV"),
+                #                   menuItem("permutation test",tabName = "pcr_permtation"))),
+                #          menuItem("PLS",tabName = "pls",
+                #                   menuItem("single CV",tabName = "pls_CV"),
+                #                   # menuItem("repeated CV",tabName = "pls_r_CV"),
+                #                   menuItem("permutation test",tabName = "pls_permtation"))),
+                
+                
+                
+                
+                hr(),
                 menuItem("Experimentals vs Calculated",tabName = "exp_calc"),
                 menuItem("Residuals",tabName = "res"),
                 menuItem("Scores",tabName = "scores"),
@@ -185,17 +199,21 @@ body<-dashboardBody(
       
 # PLS -------------------------------------------------------------------    
 
-# PLS - modello single CV-----------------------------------------------------------
+# PLS - costruzione modello -----------------------------------------------------------
 
       tabItem(tabName = "pls_CV",
-              fluidPage(titlePanel("Model computation: PLS single CV"),
-
+              fluidPage(titlePanel("Model computation"),
+                        
+                        column(12,
+                               radioButtons("pls_cv_choise", label ="",inline=TRUE,
+                                            choices = list("single CV" = 1, "repeated CV" = 2), 
+                                            selected = 1)),
                         column(4,
                                checkboxInput("pls_scale", label = "Scale (centering by default)", value = TRUE)),
                         column(4,
-                               uiOutput('n_comp')),
+                               uiOutput('pls_n_comp')),
                         column(4,
-                               uiOutput('n_cv')),
+                               uiOutput('pls_n_cv')),
                         column(12,
                                actionButton("bplsmodel", label = "Execute")),
                         column(12,
@@ -203,13 +221,17 @@ body<-dashboardBody(
                         column(8,
                                plotOutput('cv_plot',height = "600px"),
                                br(),
-                               verbatimTextOutput('model_out')),
+                               verbatimTextOutput('model_out_1'),
+                               verbatimTextOutput('model_out_2')),
                         column(4,
-                              uiOutput('n_comp_df'),
-                              br(),
-                              uiOutput('bplsmodel_df'),
-                              br(),
-                              verbatimTextOutput('model_out_df'))
+                               uiOutput('pls_n_rnd'),
+                               br(),
+                               uiOutput('n_comp_df'),
+                               br(),
+                               uiOutput('bplsmodel_df'),
+                               br(),
+                               verbatimTextOutput('model_out_df'))
+                              
                         )
               
               ),
@@ -248,40 +270,40 @@ tabItem(tabName = "res",
                          uiOutput('pls_res_rnames'))
         )
 ),
-
-
-# PLS - Cv ripetuto -------------------------------------------------------
-
-tabItem(tabName = "pls_r_CV",
-        fluidPage(titlePanel("Model computation: PLS repeated CV"),
-                  
-                  column(4,
-                         checkboxInput("pls_r_CV_scale", label = "Scale (centering by default)", value = TRUE)),
-                  column(4,
-                         uiOutput('pls_r_CV_n_comp')),
-                  column(4,
-                         uiOutput('pls_r_CV_n_cv')),
-                  column(12,
-                         actionButton("pls_r_CV_bplsmodel", label = "Execute")),
-                  column(12,
-                         hr()),
-                  column(8,
-                         plotOutput('pls_r_CV_cv_plot',height = "600px"),
-                         br(),
-                         verbatimTextOutput('pls_r_CV_model_out')
-                         ),
-                  column(4,
-                         uiOutput('pls_r_CV_n_rnd'),
-                         br(),
-                         uiOutput('pls_r_CV_n_comp_df'),
-                         br(),
-                         uiOutput('pls_r_CV_bplsmodel_df'),
-                         br(),
-                         verbatimTextOutput('pls_r_CV_model_out_df')
-                         )
-        )
-        
-),
+# 
+# 
+# # PLS - Cv ripetuto -------------------------------------------------------
+# 
+# tabItem(tabName = "pls_r_CV",
+#         fluidPage(titlePanel("Model computation: PLS repeated CV"),
+#                   
+#                   column(4,
+#                          checkboxInput("pls_r_CV_scale", label = "Scale (centering by default)", value = TRUE)),
+#                   column(4,
+#                          uiOutput('pls_r_CV_n_comp')),
+#                   column(4,
+#                          uiOutput('pls_r_CV_n_cv')),
+#                   column(12,
+#                          actionButton("pls_r_CV_bplsmodel", label = "Execute")),
+#                   column(12,
+#                          hr()),
+#                   column(8,
+#                          plotOutput('pls_r_CV_cv_plot',height = "600px"),
+#                          br(),
+#                          verbatimTextOutput('pls_r_CV_model_out')
+#                          ),
+#                   column(4,
+#                          uiOutput('pls_r_CV_n_rnd'),
+#                          br(),
+#                          uiOutput('pls_r_CV_n_comp_df'),
+#                          br(),
+#                          uiOutput('pls_r_CV_bplsmodel_df'),
+#                          br(),
+#                          verbatimTextOutput('pls_r_CV_model_out_df')
+#                          )
+#         )
+#         
+# ),
 
 
 
