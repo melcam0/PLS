@@ -14,64 +14,25 @@ sidebar<- dashboardSidebar(
                   menuItem("Row profile",tabName = "profile"),
                   actionButton("reset","Delete",style='padding:4px; font-size:80%')
                   ),
-                
-                
-                
                 menuItem(text = "Model computation",icon = shiny::icon("expand-arrows-alt"),
                          menuItem("PCR",tabName = "pcr",
                                   menuItem("single CV",tabName = "pcr_CV"),
-                                  menuItem("repeated CV",tabName = "pcr_r_cv"),
+                                  menuItem("repeated CV",tabName = "pcr_r_CV"),
                                   menuItem("permutation test",tabName = "pcr_permtation")),
                          menuItem("PLS",tabName = "pls",
                                   menuItem("single CV",tabName = "pls_CV"),
-                                  menuItem("repeated CV",tabName = "ppls_r_cv"),
+                                  menuItem("repeated CV",tabName = "pls_r_CV"),
                                   menuItem("permutation test",tabName = "pls_permtation"))),
-                
-                
-                
-                # menuItem(text = "PCA",icon = shiny::icon("expand-arrows-alt"),
-                #   menuItem("Model computation",tabName = "modello"),
-                #   menuItem("Missing data recostruction",tabName = "dati_mancanti"),
-                #   menuItem("Randomization Test",tabName = "rnd_test"),
                   hr(),
                 menuItem("Experimentals vs Calculated",tabName = "exp_calc"),
-                
                 menuItem("Residuals",tabName = "res"),
                 menuItem("Scores",tabName = "scores"),
                 menuItem("Loadings",tabName = "load"),
                 menuItem("Biplot",tabName = "biplot"),
                 menuItem("Coefficients",tabName = "coeff"),
                 menuItem("Prediction",tabName = "pred"),
-                
-                
-                #   menuItem("Plots",tabName = "grafici",
-                #            menuItem('Score plot',tabName = 'scores',
-                #                     menuItem('Score plot',tabName = 'scores')),
-                #            menuItem('Loading plot',tabName = 'loadings'),
-                #            menuItem('Biplot',tabName = 'biplot'),
-                #            menuItem('Correlation plot',tabName = 'correlation'),
-                #            menuItem('Var. of each variable explained',tabName = 'var_variable')),
-                #   menuItem('Diagnostics',
-                #            menuItem(HTML('T <sup>2</sup> and/vs Q'),tabName = 't2andq'),
-                #            # menuItem('T^2 vs. Q (Influence Plot)',tabName='t2vsq'),
-                #            menuItem(HTML('T <sup>2</sup> Contribution Plot'),tabName = 't2contr'),
-                #            menuItem('Q Contribution Plot',tabName = 'qcontr')),
-                #   menuItem('External data set',
-                #            menuItem('Projection on the training set',tabName='ext_prj'),
-                #            menuItem(HTML('T <sup>2</sup> vs. Q (Influence Plot)'),tabName = 'ext_t2andq'),
-                #            menuItem(HTML('T <sup>2</sup> Contribution Plot'),tabName = 'ext_t2contr'),
-                #            menuItem('Q Contribution Plot',tabName = 'ext_qcontr'))
-                # ),
-                # 
-    
-    
-    
-    
-    
                 hr(),
                 menuItem(text = "File",icon = icon("briefcase", lib = "font-awesome"),
-                         # menuSubItem("Dispensa",tabName = "dispensa"),
-                         # menuSubItem("Diapositive",tabName = "diapositive"),
                          tags$header(
                            # em(  
                            #   a(href="https://dispensepca.netlify.app/",  "   Dispense" ,target="_blank",style="white-space: pre-wrap")
@@ -178,24 +139,12 @@ body<-dashboardBody(
                                     tabPanel("Supplementary variables",
                                              column(4,
                                                  uiOutput("var_quali"),
-                                                 
-                                                 
-                                                
-                                                 
-                                                 
                                                  uiOutput('var_quanti_sup')),
                                              column(8,"Quantitative variables for pls",
                                                 verbatimTextOutput("var_quanti"))),
-                                    
-                                    
-                                    
                                     tabPanel("Responce variable",
                                              column(12,
                                                     uiOutput("var_y")))
-                                    
-                                    
-                                    
-                                    
                                     ))),
 
       tabItem(tabName = "oggetti",
@@ -209,14 +158,7 @@ body<-dashboardBody(
       tabItem(tabName = "vedi",
               fluidPage(titlePanel("Dati"),
                         div(style = 'overflow-x: scroll;',DT::dataTableOutput("dati")))),
-      
-      
-      
-      
-      
-      
-      
-      
+
       tabItem(tabName = "profile",
               fluidPage(titlePanel("Row profile"),
                         column(8
@@ -225,15 +167,6 @@ body<-dashboardBody(
                                ),
                         column(4,
                                uiOutput('profile_col'),
-                               
-                               
-                               
-                               # selectInput("profile_transf", label = "Transformations", 
-                               #             choices = list("None" = 1, "Autoscaling (SNV)" = 2, "Binning" = 3, "First Derivative" = 4,
-                               #                            "Second Derivative" = 5, "Savitzky-Golay" = 6), 
-                               #             selected = 1)
-                               
-                               
                                pickerInput("profile_transf", label = "Transformations",
                                            choices = list("Autoscaling (SNV)", "Binning", "First Derivative",
                                                           "Second Derivative", "Savitzky-Golay"),
@@ -242,23 +175,12 @@ body<-dashboardBody(
                                              "max-options-text" = "No more!"
                                            ),
                                            multiple = TRUE),
-                               
                                actionButton("profile_reset","Reset",style='padding:4px; font-size:80%')
-                               
-                               
-                               
-                           
-                               
-                               
                                ),
                         column(12,
                                h5('Subsequent transformations'),
                                verbatimTextOutput('profile_success_trasf'),
                                downloadButton("ds_tr_download"))
-                        
-                        
-                        
-                        
                         )), 
       
 # PLS -------------------------------------------------------------------    
@@ -278,26 +200,97 @@ body<-dashboardBody(
                                actionButton("bplsmodel", label = "Execute")),
                         column(12,
                                hr()),
-
-
-
-
-
-
-                        column(12,
-                               plotOutput('cv_plot',height = "600px")),
-                        # column(4,
-                        #        uiOutput('pca_var_type')),
-                        column(12,
-                               br()),
-                        
-                        # 
-                        column(12,
-                               verbatimTextOutput('model_out')
-                               ),
+                        column(8,
+                               plotOutput('cv_plot',height = "600px"),
+                               br(),
+                               verbatimTextOutput('model_out')),
+                        column(4,
+                              uiOutput('n_comp_df'),
+                              br(),
+                              uiOutput('bplsmodel_df'),
+                              br(),
+                              verbatimTextOutput('model_out_df'))
                         )
               
               ),
+
+# PLS - Exp vs calc -------------------------------------------------------------
+
+tabItem(tabName = "exp_calc",
+        fluidPage(titlePanel("Experimentals vs Calculated"),
+                  column(8,
+                         hr(),
+                         plotOutput('pls_expvsfitted',height = "600px"),
+                         br(),
+                         downloadButton("pls_fitting_dwl")),
+                  column(4,
+                         hr(),
+                         uiOutput('pls_expvsfitted_label'),
+                         uiOutput('pls_expvsfitted_col'),
+                         uiOutput('pls_expvsfitted_rnames'))
+                  )
+        ),
+
+
+# PLS - residui -----------------------------------------------------------
+
+tabItem(tabName = "res",
+        fluidPage(titlePanel("Residuals"),
+                  column(8,
+                         hr(),
+                         plotOutput('pls_res_plot',height = "600px"),
+                         br(),
+                         downloadButton("pls_res_dwl")),
+                  column(4,
+                         hr(),
+                         uiOutput('pls_res_label'),
+                         uiOutput('pls_res_col'),
+                         uiOutput('pls_res_rnames'))
+        )
+),
+
+
+# PLS - Cv ripetuto -------------------------------------------------------
+
+tabItem(tabName = "pls_r_CV",
+        fluidPage(titlePanel("Model computation: PLS repeated CV"),
+                  
+                  column(4,
+                         checkboxInput("pls_r_CV_scale", label = "Scale (centering by default)", value = TRUE)),
+                  column(4,
+                         uiOutput('pls_r_CV_n_comp')),
+                  column(4,
+                         uiOutput('pls_r_CV_n_cv')),
+                  column(12,
+                         actionButton("pls_r_CV_bplsmodel", label = "Execute")),
+                  column(12,
+                         hr()),
+                  column(8,
+                         plotOutput('pls_r_CV_cv_plot',height = "600px"),
+                         br(),
+                         verbatimTextOutput('pls_r_CV_model_out')
+                         ),
+                  column(4,
+                         uiOutput('pls_r_CV_n_rnd'),
+                         br(),
+                         uiOutput('pls_r_CV_n_comp_df'),
+                         br(),
+                         uiOutput('pls_r_CV_bplsmodel_df'),
+                         br(),
+                         verbatimTextOutput('pls_r_CV_model_out_df')
+                         )
+        )
+        
+),
+
+
+
+
+
+
+
+
+
 
 
 # PCA - missing data reconstruction ---------------------------------------
@@ -348,36 +341,36 @@ tabItem(tabName = "rnd_test",
         )),
 # PCA - plots -------------------------------------------------------------
 # PCA - scores plot -------------------------------------------------------
-tabItem(tabName = "scores",
-        fluidPage(titlePanel("Score Plots"),
-                  column(8,radioButtons("pca_radio_score_type", "Plots",
-                                        choices = c(Bidimensional = "2d", Tridimensional = "3d"), 
-                                        selected = "2d", inline=TRUE)),
-                  column(2),
-                  column(12),
-                  column(8,
-                         plotOutput('scores_pl',height = "600px"),
-                         br()),
-                  column(4,
-                         uiOutput('pca_score_compx'),
-                         uiOutput('pca_score_compy'),
-                         uiOutput('pca_score_compz'),
-                         uiOutput('pca_score_label'),
-                         uiOutput('pca_score_col'),
-                         uiOutput('pca_score_chull'),
-                         uiOutput('pca_score_col_fatt'),
-                         uiOutput('pca_score_chull_fatt'),
-                         uiOutput('pca_score_rnames'),
-                         uiOutput('pca_score_ell'),
-                         uiOutput('pca_score_line'),
-                         uiOutput('scores_pl3d_lv_z'),
-                         uiOutput('scores_pl3d_lv_x')),
-                  column(12,
-                         # verbatimTextOutput('pca_score_out'),
-                         downloadButton("pca_score_dwl")),
-
-                  
-        )),
+# tabItem(tabName = "scores",
+#         fluidPage(titlePanel("Score Plots"),
+#                   column(8,radioButtons("pca_radio_score_type", "Plots",
+#                                         choices = c(Bidimensional = "2d", Tridimensional = "3d"), 
+#                                         selected = "2d", inline=TRUE)),
+#                   column(2),
+#                   column(12),
+#                   column(8,
+#                          plotOutput('scores_pl',height = "600px"),
+#                          br()),
+#                   column(4,
+#                          uiOutput('pca_score_compx'),
+#                          uiOutput('pca_score_compy'),
+#                          uiOutput('pca_score_compz'),
+#                          uiOutput('pca_score_label'),
+#                          uiOutput('pca_score_col'),
+#                          uiOutput('pca_score_chull'),
+#                          uiOutput('pca_score_col_fatt'),
+#                          uiOutput('pca_score_chull_fatt'),
+#                          uiOutput('pca_score_rnames'),
+#                          uiOutput('pca_score_ell'),
+#                          uiOutput('pca_score_line'),
+#                          uiOutput('scores_pl3d_lv_z'),
+#                          uiOutput('scores_pl3d_lv_x')),
+#                   column(12,
+#                          # verbatimTextOutput('pca_score_out'),
+#                          downloadButton("pca_score_dwl")),
+# 
+#                   
+#         )),
 # PCA - loading plot ------------------------------------------------------
 
 tabItem(tabName = "loadings",
