@@ -5,7 +5,7 @@ header<-dashboardHeader(title = "PLS",
 
 sidebar<- dashboardSidebar(
     sidebarMenu(
-                menuItem(text = "Data",icon = shiny::icon("file-text"),
+                menuItem(text = "Data",icon = shiny::icon("file-alt"),
                   menuItem("Examples",tabName = "esempi"),
                   menuItem("Load data",tabName = "importa"),
                   menuItem("Variables",tabName = "variabili"),
@@ -219,19 +219,18 @@ body<-dashboardBody(
                         column(12,
                                hr()),
                         column(8,
-                               plotOutput('cv_plot',height = "600px"),
+                               plotOutput('pls_cv_plot',height = "600px"),
                                br(),
                                verbatimTextOutput('model_out_1'),
                                verbatimTextOutput('model_out_2')),
                         column(4,
                                uiOutput('pls_n_rnd'),
                                br(),
-                               uiOutput('n_comp_df'),
-                               br(),
-                               uiOutput('bplsmodel_df'),
-                               br(),
-                               verbatimTextOutput('model_out_df'))
-                              
+                               uiOutput('pls_n_comp_df'),
+                               # br(),
+                               # uiOutput('bplsmodel_df'),
+                               # br(),
+                               verbatimTextOutput('plsmodel_out_df'))
                         )
               
               ),
@@ -253,7 +252,6 @@ tabItem(tabName = "exp_calc",
                   )
         ),
 
-
 # PLS - residui -----------------------------------------------------------
 
 tabItem(tabName = "res",
@@ -268,8 +266,55 @@ tabItem(tabName = "res",
                          uiOutput('pls_res_label'),
                          uiOutput('pls_res_col'),
                          uiOutput('pls_res_rnames'))
-        )
-),
+        )),
+
+# PLS - scores plot -------------------------------------------------------
+tabItem(tabName = "scores",
+        fluidPage(titlePanel("Score Plots"),
+                  column(12,
+                         radioButtons("pls_res_scale", label ="",inline=TRUE,
+                                      choices = list("Same scale" = 1, "Different scale" = 2), 
+                                      selected = 1)),
+                  column(8,
+                         plotOutput('pls_scores_plot',height = "600px"),
+                         br(),
+                         downloadButton("pls_score_dwl")),
+                  column(4,
+                         uiOutput('pls_score_compx'),
+                         uiOutput('pls_score_compy'),
+                         uiOutput('pls_score_label'),
+                         uiOutput('pls_score_col'),
+                         uiOutput('pls_score_rnames'))
+
+        )),
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # 
 # 
 # # PLS - Cv ripetuto -------------------------------------------------------

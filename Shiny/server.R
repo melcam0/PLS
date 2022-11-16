@@ -696,7 +696,7 @@ server <- function (input , output, session ){
           withProgress(message = 'Reapeated CV:',value = 0, {
             n <- as.numeric(input$pls_n_rnd)
             for(i in 1:n){
-              incProgress(detail = paste("times", i),amount = 1/n)
+              incProgress(detail = paste(i,"times"),amount = 1/n)
               a=as.numeric(Sys.time())
               set.seed(a)
               M_=M_[sample(nrow(M_)),]
@@ -776,13 +776,20 @@ output$model_out_2 <- renderPrint({
   
 })
 
-# output$n_comp_df<-renderUI({
-#   req(!is.null(PLS$res))
-#   rmsep<-RMSEP(PLS$res,intercep=FALSE)
-#   selectInput("n_comp_df", label = "Number of components",
-#               choices = c(2:length(dati$var_qt)),
-#               selected = which.min(rmsep$val[1,,]))
-# })
+output$pls_n_comp_df<-renderUI({
+  req(!is.null(PLS$res))
+  rmsep<-RMSEP(PLS$res,intercep=FALSE)
+  selectInput("pls_n_comp_df", label = "Number of components",
+              choices = c(2:length(dati$var_qt)),
+              selected = which.min(rmsep$val[1,,]))
+})
+
+output$plsmodel_out_df <- renderPrint({
+  req(!is.null(PLS$res))
+  cat(paste('Model created with ',format(as.numeric(input$pls_n_comp_df),digits=2),
+                                               ' components',sep=''))
+})
+
 # 
 # output$bplsmodel_df <- renderUI({
 #   req(!is.null(PLS$res))
@@ -805,252 +812,278 @@ output$model_out_2 <- renderPrint({
 #   cat(plsdf$testo)
 # })
 # 
-# output$cv_plot<-renderPlot({
-#   req(!is.null(PLS$res))
-#   vm<-R2(PLS$res,estimate='CV',ncomp=1:input$n_comp,intercept=FALSE)$val[1,,]*100
-#   rmsep<-RMSEP(PLS$res,intercep=FALSE)
-#   op<-par(pty='s',mfrow=c(1,2))
-#   plot(rmsep$val[1,,],xlab='Number of Components',ylab='RMSECV',main='');grid()
-#   lines(rmsep$val[1,,])
-#   vm<-R2(PLS$res,estimate='CV',ncomp=1:input$n_comp,intercept=FALSE)$val[1,,]*100
-#   plot(vm,xlab='Number of Components',ylab='CV % Explained Variance',ylim=c(min(0,min(vm)),100));grid()#
-#   lines(vm)
-#   par(op)
-# })
-
-
-# PLS - CV ripetuto -------------------------------------------------------
-
-output$pls_r_CV_n_comp<-renderUI({
-  req(dati$var_qt)
-  selectInput("pls_r_CV_n_comp", label = "Max. number of components", 
-              choices = c(2:length(dati$var_qt)), 
-              selected = 10)
-})
-
-output$pls_r_CV_n_cv<-renderUI({
-  req(!is.null(dati$DS))
-  selectInput("pls_r_CV_n_cv", label = "Number of segments for CV", 
-              choices = c(2:nrow(dati$DS)), 
-              selected = 5)
-})
-
-observeEvent(input$pls_r_CV_bplsmodel,{
-  validate(need(nrow(dati$DS)!=0,""))
-  if(is.null(input$var_y)){
-    sendSweetAlert(session, title = "Input Error",
-                   text = 'Select responce variable!',
-                   type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
-  }else{
-    sc<-as.logical(as.logical(input$pls_r_CV_scale))
-    M_<-dati$DS[,dati$var_qt]
-    if(!is.null(input$var_y))M_ <- M_[,colnames(M_)!=input$var_y]
-    Y_ <- dati$DS[,input$var_y]
-    
-    M_<-data.frame(cbind(Y_,data.frame(M_)))
-    
-    naM<-names(M_)
-    nNA<-sum(is.na(M_))
-    nY<-1
-    if(nNA>0){
-      mess<-paste(as.character(nNA),'NA present.We try to rebuild them!')
-      showNotification(mess)
-      md<-prep(M_,scale="uv",center=TRUE,simple=FALSE,rev=FALSE)
-      res<-pca(md$data,method="nipals",nPcs=min(ncol(M_),10),scale="uv",center=TRUE)
-      M_<-prep(res@completeObs,scale=md$scale,center=md$center,reverse=TRUE)
-      M_<-as.data.frame(M_)
-    }
-    
-    M._<-M_
-    ncompo<-min(as.numeric(input$pls_r_CV_n_comp),ncol(M_)-1)
+output$pls_cv_plot<-renderPlot({
+  req(!is.null(PLS$res))
+  if(input$pls_cv_choise=="1"){
+    vm<-R2(PLS$res,estimate='CV',ncomp=1:as.numeric(input$pls_n_comp),intercept=FALSE)$val[1,,]*100
+    rmsep<-RMSEP(PLS$res,intercep=FALSE)
+    op<-par(pty='s',mfrow=c(1,2))
+    plot(rmsep$val[1,,],xlab='Number of Components',ylab='RMSECV',main='');grid()
+    lines(rmsep$val[1,,])
+    vm<-R2(PLS$res,estimate='CV',ncomp=1:as.numeric(input$pls_n_comp),intercept=FALSE)$val[1,,]*100
+    plot(vm,xlab='Number of Components',ylab='CV % Explained Variance',ylim=c(min(0,min(vm)),100));grid()#
+    lines(vm)
+    par(op)
+  }
+  if(input$pls_cv_choise=="2"){
+    req(!is.null(PLS$D))
+    D_min<-apply(PLS$D[,-1],2,min)
+    D_max<-apply(PLS$D[,-1],2,max)
     
     
+    op<-par(pty='s',mfrow=c(2,2))
+    plot(sqrt(apply(PLS$D^2,2,mean))[-1],xlab='Number of Components',ylab='Global RMSECV',main='',
+         ylim = c(min(D_min),max(D_max)));grid()
+    lines(sqrt(apply(PLS$D^2,2,mean))[-1]) 
+    lines(D_min,col='red',lty = 2)
+    lines(D_max,col='red',lty = 2)
     
-    model<-paste(naM[nY],'~',(paste(naM[-nY],collapse='+')),sep='')
+    plot(PLS$R_sq*100,xlab='Number of Components',ylab='CV % Explained Variance',
+         ylim=c(min(0,min(PLS$R_sq*100)),100));grid()
+    lines(PLS$R_sq*100)
     
+    N <- PLS$D[,1]
+    N<-c(N,min(N):max(N))
+    F<-as.factor(N)
+    plot(F[1:as.numeric(input$pls_n_rnd)],xlab='Number of Components',ylab='Frequency')
+    par(op)
     
-    N<-c(NULL)
-    D<-data.frame(NULL)
-    withProgress(message = 'Reapeated CV:',value = 0, {
-      n <- as.numeric(input$pls_r_CV_n_rnd)
-      for(i in 1:as.numeric(input$pls_r_CV_n_rnd)){
-        incProgress(detail = paste("times", i),amount = 1/n)
-        a=as.numeric(Sys.time())
-        set.seed(a)
-        M_=M_[sample(nrow(M_)),]
-        M_<-as.data.frame(M_)
-        res<-plsr(as.formula(model),ncomp=as.numeric(input$pls_r_CV_n_comp),data=M_,segment.type="interleaved",
-                  validation='CV',segments=as.numeric(input$pls_r_CV_n_cv),scale=sc)
-        # resf<-plsr(as.formula(model),ncomp=ncompo,data=M_,validation='none',
-        # scale=as.logical(ans[[7]]))
-        rmsep<-RMSEP(res,intercep=FALSE)
-        N[i]<-which.min(rmsep$val[1,,])
-        D<-rbind.data.frame(D,rmsep$val[1,,])
-      }
-      
-    })
-    
-
-    colnames(D)<-paste('Comp',c(1:as.numeric(input$pls_r_CV_n_comp)))
-    D<-cbind.data.frame(N=N,D)
-    # D_min<-apply(D[,-1],2,min)
-    # D_max<-apply(D[,-1],2,max)
-
-    R_sq<-1-apply(D[,-1]^2,2,mean)*length(Y_)/sum((Y_ - mean(Y_))^2)
-
-    # pls_rnd.set<-ans
-    PLS$typ<-'PLS1'
-    PLS$dataset<-M._
-    PLS$nY<-nY
-    PLS$validation<-'CV'
-    # PLS$nseg<-as.numeric(ans[[6]])
-    PLS$segtype<-'interleaved'
-    # PLS$scale<-sc
-    PLS$model<-as.formula(model)
-
-    PLS$R_sq <- R_sq
-    PLS$D <- D
-    
-    
-    
-    
-    
-    
-    
-  #   M_<-dati$DS[,dati$var_qt]
-  #   if(!is.null(input$var_y))M_ <- M_[,colnames(M_)!=input$var_y]
-  #   Y_ <- dati$DS[,input$var_y]
-  #   if((typeof(M_)=='double')|(typeof(M_)=='list')){
-  #     M_<-data.frame(cbind(Y_,data.frame(M_)))
-  #     naM<-names(M_)
-  #     nNA<-sum(is.na(M_))
-  #     nY<-1
-  #     if(nNA>0){
-  #       mess<-paste(as.character(nNA),'NA present.We try to rebuild them!')
-  #       showNotification(mess)
-  #       md<-prep(M_,scale="uv",center=TRUE,simple=FALSE,rev=FALSE)
-  #       res<-pca(md$data,method="nipals",nPcs=min(ncol(M_),10),scale="uv",center=TRUE)
-  #       M_<-prep(res@completeObs,scale=md$scale,center=md$center,reverse=TRUE)
-  #       M_<-as.data.frame(M_)
-  #     }
-  #     ncompo<-min(as.numeric(input$n_comp),ncol(M_)-1)
-  #     model<-paste(naM[nY],'~',(paste(naM[-nY],collapse='+')),sep='')
-  #     res<-plsr(as.formula(model),ncomp=ncompo,data=M_,segment.type="interleaved",
-  #               validation='CV',segments=as.numeric(input$n_cv),scale=as.logical(input$pls_scale))
-  #     resf<-plsr(as.formula(model),ncomp=ncompo,data=M_,validation='none',
-  #                scale=as.logical(input$pls_scale))
-  #     PLS$res <- res
-  #     PLS$resf <- resf
-  #     # PLS$ncompo <- ncompo
-  #     PLS$typ<-'PLS1'
-  #     PLS$dataset<-M_
-  #     PLS$nY<-nY
-  #     PLS$validation<-'CV'
-  #     # PLS$nseg<-as.numeric(input$n_cv)
-  #     PLS$segtype<-'interleaved'
-  #     # PLS$scale<-as.logical(input$pls_scale)
-  #     PLS$model<-as.formula(model)
-  #   }else{
-  #     sendSweetAlert(session, title = "Input Error",
-  #                    text = 'Matrix/Table Requested!',
-  #                    type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
-  #   }
   }
 })
 
-output$pls_r_CV_model_out <- renderPrint({
-  validate(need(nrow(dati$DS)!=0,"Load a dataset!"))
-  validate(need(!is.null(PLS),"Execute the model!"))
-#   vm<-R2(PLS$res,estimate='CV',ncomp=1:input$n_comp,intercept=FALSE)$val[1,,]*100
+
+# # PLS - CV ripetuto -------------------------------------------------------
+# 
+# output$pls_r_CV_n_comp<-renderUI({
+#   req(dati$var_qt)
+#   selectInput("pls_r_CV_n_comp", label = "Max. number of components", 
+#               choices = c(2:length(dati$var_qt)), 
+#               selected = 10)
+# })
+# 
+# output$pls_r_CV_n_cv<-renderUI({
+#   req(!is.null(dati$DS))
+#   selectInput("pls_r_CV_n_cv", label = "Number of segments for CV", 
+#               choices = c(2:nrow(dati$DS)), 
+#               selected = 5)
+# })
+# 
+# observeEvent(input$pls_r_CV_bplsmodel,{
+#   validate(need(nrow(dati$DS)!=0,""))
+#   if(is.null(input$var_y)){
+#     sendSweetAlert(session, title = "Input Error",
+#                    text = 'Select responce variable!',
+#                    type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
+#   }else{
+#     sc<-as.logical(as.logical(input$pls_r_CV_scale))
+#     M_<-dati$DS[,dati$var_qt]
+#     if(!is.null(input$var_y))M_ <- M_[,colnames(M_)!=input$var_y]
+#     Y_ <- dati$DS[,input$var_y]
+#     
+#     M_<-data.frame(cbind(Y_,data.frame(M_)))
+#     
+#     naM<-names(M_)
+#     nNA<-sum(is.na(M_))
+#     nY<-1
+#     if(nNA>0){
+#       mess<-paste(as.character(nNA),'NA present.We try to rebuild them!')
+#       showNotification(mess)
+#       md<-prep(M_,scale="uv",center=TRUE,simple=FALSE,rev=FALSE)
+#       res<-pca(md$data,method="nipals",nPcs=min(ncol(M_),10),scale="uv",center=TRUE)
+#       M_<-prep(res@completeObs,scale=md$scale,center=md$center,reverse=TRUE)
+#       M_<-as.data.frame(M_)
+#     }
+#     
+#     M._<-M_
+#     ncompo<-min(as.numeric(input$pls_r_CV_n_comp),ncol(M_)-1)
+#     
+#     
+#     
+#     model<-paste(naM[nY],'~',(paste(naM[-nY],collapse='+')),sep='')
+#     
+#     
+#     N<-c(NULL)
+#     D<-data.frame(NULL)
+#     withProgress(message = 'Reapeated CV:',value = 0, {
+#       n <- as.numeric(input$pls_r_CV_n_rnd)
+#       for(i in 1:as.numeric(input$pls_r_CV_n_rnd)){
+#         incProgress(detail = paste("times", i),amount = 1/n)
+#         a=as.numeric(Sys.time())
+#         set.seed(a)
+#         M_=M_[sample(nrow(M_)),]
+#         M_<-as.data.frame(M_)
+#         res<-plsr(as.formula(model),ncomp=as.numeric(input$pls_r_CV_n_comp),data=M_,segment.type="interleaved",
+#                   validation='CV',segments=as.numeric(input$pls_r_CV_n_cv),scale=sc)
+#         # resf<-plsr(as.formula(model),ncomp=ncompo,data=M_,validation='none',
+#         # scale=as.logical(ans[[7]]))
+#         rmsep<-RMSEP(res,intercep=FALSE)
+#         N[i]<-which.min(rmsep$val[1,,])
+#         D<-rbind.data.frame(D,rmsep$val[1,,])
+#       }
+#       
+#     })
+#     
+# 
+#     colnames(D)<-paste('Comp',c(1:as.numeric(input$pls_r_CV_n_comp)))
+#     D<-cbind.data.frame(N=N,D)
+#     # D_min<-apply(D[,-1],2,min)
+#     # D_max<-apply(D[,-1],2,max)
+# 
+#     R_sq<-1-apply(D[,-1]^2,2,mean)*length(Y_)/sum((Y_ - mean(Y_))^2)
+# 
+#     # pls_rnd.set<-ans
+#     PLS$typ<-'PLS1'
+#     PLS$dataset<-M._
+#     PLS$nY<-nY
+#     PLS$validation<-'CV'
+#     # PLS$nseg<-as.numeric(ans[[6]])
+#     PLS$segtype<-'interleaved'
+#     # PLS$scale<-sc
+#     PLS$model<-as.formula(model)
+# 
+#     PLS$R_sq <- R_sq
+#     PLS$D <- D
+#     
+#     
+#     
+#     
+#     
+#     
+#     
+#   #   M_<-dati$DS[,dati$var_qt]
+#   #   if(!is.null(input$var_y))M_ <- M_[,colnames(M_)!=input$var_y]
+#   #   Y_ <- dati$DS[,input$var_y]
+#   #   if((typeof(M_)=='double')|(typeof(M_)=='list')){
+#   #     M_<-data.frame(cbind(Y_,data.frame(M_)))
+#   #     naM<-names(M_)
+#   #     nNA<-sum(is.na(M_))
+#   #     nY<-1
+#   #     if(nNA>0){
+#   #       mess<-paste(as.character(nNA),'NA present.We try to rebuild them!')
+#   #       showNotification(mess)
+#   #       md<-prep(M_,scale="uv",center=TRUE,simple=FALSE,rev=FALSE)
+#   #       res<-pca(md$data,method="nipals",nPcs=min(ncol(M_),10),scale="uv",center=TRUE)
+#   #       M_<-prep(res@completeObs,scale=md$scale,center=md$center,reverse=TRUE)
+#   #       M_<-as.data.frame(M_)
+#   #     }
+#   #     ncompo<-min(as.numeric(input$n_comp),ncol(M_)-1)
+#   #     model<-paste(naM[nY],'~',(paste(naM[-nY],collapse='+')),sep='')
+#   #     res<-plsr(as.formula(model),ncomp=ncompo,data=M_,segment.type="interleaved",
+#   #               validation='CV',segments=as.numeric(input$n_cv),scale=as.logical(input$pls_scale))
+#   #     resf<-plsr(as.formula(model),ncomp=ncompo,data=M_,validation='none',
+#   #                scale=as.logical(input$pls_scale))
+#   #     PLS$res <- res
+#   #     PLS$resf <- resf
+#   #     # PLS$ncompo <- ncompo
+#   #     PLS$typ<-'PLS1'
+#   #     PLS$dataset<-M_
+#   #     PLS$nY<-nY
+#   #     PLS$validation<-'CV'
+#   #     # PLS$nseg<-as.numeric(input$n_cv)
+#   #     PLS$segtype<-'interleaved'
+#   #     # PLS$scale<-as.logical(input$pls_scale)
+#   #     PLS$model<-as.formula(model)
+#   #   }else{
+#   #     sendSweetAlert(session, title = "Input Error",
+#   #                    text = 'Matrix/Table Requested!',
+#   #                    type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
+#   #   }
+#   }
+# })
+# 
+# output$pls_r_CV_model_out <- renderPrint({
+#   validate(need(nrow(dati$DS)!=0,"Load a dataset!"))
+#   validate(need(!is.null(PLS),"Execute the model!"))
+# #   vm<-R2(PLS$res,estimate='CV',ncomp=1:input$n_comp,intercept=FALSE)$val[1,,]*100
+# #   rmsep<-RMSEP(PLS$res,intercep=FALSE)
+#   cat(' ',"\n")
+#   cat('CV% Explained Variance',"\n")
+#   print(round(PLS$R_sq*100,2),quote=FALSE)
+# #   print(round(vm,2))
+#   cat(' ',"\n")
+#   cat('Global RMSECV',"\n")
+#   print(round(sqrt(apply(PLS$D^2,2,mean))[-1],4))
+# #   print(round(rmsep$val[1,,],4))
+#   cat(' ',"\n")
+#   cat(paste('Minimum Global RMSECV at component n.',which.min(sqrt(apply(D^2,2,mean))[-1])))
+# #   cat(paste('Minimum RMSECV at component n.',which.min(rmsep$val[1,,])),"\n")
+# })
+# 
+# 
+# output$pls_r_CV_n_rnd<-renderUI({
+#   req(!is.null(dati$DS))
+#   selectInput("pls_r_CV_n_rnd", label = "Number of randomizations", 
+#               choices = c(1:1000), 
+#               selected = 100)
+# })
+# 
+# output$pls_r_CV_n_comp_df<-renderUI({
+#   req(!is.null(PLS$res))
 #   rmsep<-RMSEP(PLS$res,intercep=FALSE)
-  cat(' ',"\n")
-  cat('CV% Explained Variance',"\n")
-  print(round(PLS$R_sq*100,2),quote=FALSE)
-#   print(round(vm,2))
-  cat(' ',"\n")
-  cat('Global RMSECV',"\n")
-  print(round(sqrt(apply(PLS$D^2,2,mean))[-1],4))
-#   print(round(rmsep$val[1,,],4))
-  cat(' ',"\n")
-  cat(paste('Minimum Global RMSECV at component n.',which.min(sqrt(apply(D^2,2,mean))[-1])))
-#   cat(paste('Minimum RMSECV at component n.',which.min(rmsep$val[1,,])),"\n")
-})
-
-
-output$pls_r_CV_n_rnd<-renderUI({
-  req(!is.null(dati$DS))
-  selectInput("pls_r_CV_n_rnd", label = "Number of randomizations", 
-              choices = c(1:1000), 
-              selected = 100)
-})
-
-output$pls_r_CV_n_comp_df<-renderUI({
-  req(!is.null(PLS$res))
-  rmsep<-RMSEP(PLS$res,intercep=FALSE)
-  selectInput("pls_r_CV_n_comp_df", label = "Number of components", 
-              choices = c(2:length(dati$var_qt)), 
-              selected = which.min(rmsep$val[1,,]))
-})
-
-output$pls_r_CV_bplsmodel_df <- renderUI({
-  req(!is.null(PLS$res))
-  actionButton("pls_r_CV_bplsmodel_df", label = "Create model")
-})
-
-observeEvent(input$pls_r_CV_bplsmodel_df,{
-  req(!is.null(PLS$res))
-  # PLS$ncomp_df<-as.numeric(input$n_comp_df)
-  res<-plsr(PLS$model,ncomp=as.numeric(input$pls_r_CV_n_comp_df),data=PLS$dataset,segment.type="interleaved",
-            validation='CV',segments=as.numeric(input$pls_r_CV_n_cv),scale=input$pls_r_CV_scale)
-  resf<-plsr(PLS$model,ncomp=as.numeric(input$pls_r_CV_n_comp_df),data=PLS$dataset,validation='none',
-             scale=input$pls_r_CV_scale)
-  PLS$rmsep_df<-RMSEP(res,estimate='CV',ncomp=as.numeric(input$pls_r_CV_n_comp_df),intercept=FALSE)$val[1,,]
-  PLS$rcv_df<-R2(res,estimate='CV',ncomp=as.numeric(input$pls_r_CV_n_comp_df),intercept=FALSE)$val[1,,]*100
-  PLS$res_df<-res
-  PLS$resf<-resf
-  plsdf$testo_r_cv <- paste('Model created with ',format(as.numeric(input$pls_r_CV_n_comp_df),digits=2),
-                       ' components',sep='')
-})
-
-output$pls_r_CV_model_out_df <- renderPrint({
-  cat(plsdf$testo_r_cv)
-})
-
-output$pls_r_CV_cv_plot<-renderPlot({
-  req(!is.null(PLS$res))
-  D_min<-apply(PLS$D[,-1],2,min)
-  D_max<-apply(PLS$D[,-1],2,max)
-  
-  
-  op<-par(pty='s',mfrow=c(2,2))
-  plot(sqrt(apply(PLS$D^2,2,mean))[-1],xlab='Number of Components',ylab='Global RMSECV',main='',
-       ylim = c(min(D_min),max(D_max)));grid()
-  lines(sqrt(apply(PLS$D^2,2,mean))[-1]) 
-  lines(D_min,col='red',lty = 2)
-  lines(D_max,col='red',lty = 2)
-  
-  plot(PLS$R_sq*100,xlab='Number of Components',ylab='CV % Explained Variance',
-       ylim=c(min(0,min(PLS$R_sq*100)),100));grid()
-  lines(PLS$R_sq*100)
-  
-  N<-c(N,min(N):max(N))
-  F<-as.factor(N)
-  plot(F[1:ans[[7]]],xlab='Number of Components',ylab='Frequency')
-  par(op)
-  
-  
-  
-  # vm<-R2(PLS$res,estimate='CV',ncomp=1:input$n_comp,intercept=FALSE)$val[1,,]*100
-  # rmsep<-RMSEP(PLS$res,intercep=FALSE)
-  # op<-par(pty='s',mfrow=c(1,2))
-  # plot(rmsep$val[1,,],xlab='Number of Components',ylab='RMSECV',main='');grid()
-  # lines(rmsep$val[1,,])
-  # vm<-R2(PLS$res,estimate='CV',ncomp=1:input$n_comp,intercept=FALSE)$val[1,,]*100
-  # plot(vm,xlab='Number of Components',ylab='CV % Explained Variance',ylim=c(min(0,min(vm)),100));grid()#
-  # lines(vm)
-  # par(op)
-})
-
+#   selectInput("pls_r_CV_n_comp_df", label = "Number of components", 
+#               choices = c(2:length(dati$var_qt)), 
+#               selected = which.min(rmsep$val[1,,]))
+# })
+# 
+# output$pls_r_CV_bplsmodel_df <- renderUI({
+#   req(!is.null(PLS$res))
+#   actionButton("pls_r_CV_bplsmodel_df", label = "Create model")
+# })
+# 
+# observeEvent(input$pls_r_CV_bplsmodel_df,{
+#   req(!is.null(PLS$res))
+#   # PLS$ncomp_df<-as.numeric(input$n_comp_df)
+#   res<-plsr(PLS$model,ncomp=as.numeric(input$pls_r_CV_n_comp_df),data=PLS$dataset,segment.type="interleaved",
+#             validation='CV',segments=as.numeric(input$pls_r_CV_n_cv),scale=input$pls_r_CV_scale)
+#   resf<-plsr(PLS$model,ncomp=as.numeric(input$pls_r_CV_n_comp_df),data=PLS$dataset,validation='none',
+#              scale=input$pls_r_CV_scale)
+#   PLS$rmsep_df<-RMSEP(res,estimate='CV',ncomp=as.numeric(input$pls_r_CV_n_comp_df),intercept=FALSE)$val[1,,]
+#   PLS$rcv_df<-R2(res,estimate='CV',ncomp=as.numeric(input$pls_r_CV_n_comp_df),intercept=FALSE)$val[1,,]*100
+#   PLS$res_df<-res
+#   PLS$resf<-resf
+#   plsdf$testo_r_cv <- paste('Model created with ',format(as.numeric(input$pls_r_CV_n_comp_df),digits=2),
+#                        ' components',sep='')
+# })
+# 
+# output$pls_r_CV_model_out_df <- renderPrint({
+#   cat(plsdf$testo_r_cv)
+# })
+# 
+# output$pls_r_CV_cv_plot<-renderPlot({
+#   req(!is.null(PLS$res))
+#   D_min<-apply(PLS$D[,-1],2,min)
+#   D_max<-apply(PLS$D[,-1],2,max)
+#   
+#   
+#   op<-par(pty='s',mfrow=c(2,2))
+#   plot(sqrt(apply(PLS$D^2,2,mean))[-1],xlab='Number of Components',ylab='Global RMSECV',main='',
+#        ylim = c(min(D_min),max(D_max)));grid()
+#   lines(sqrt(apply(PLS$D^2,2,mean))[-1]) 
+#   lines(D_min,col='red',lty = 2)
+#   lines(D_max,col='red',lty = 2)
+#   
+#   plot(PLS$R_sq*100,xlab='Number of Components',ylab='CV % Explained Variance',
+#        ylim=c(min(0,min(PLS$R_sq*100)),100));grid()
+#   lines(PLS$R_sq*100)
+#   
+#   N<-c(N,min(N):max(N))
+#   F<-as.factor(N)
+#   plot(F[1:ans[[7]]],xlab='Number of Components',ylab='Frequency')
+#   par(op)
+#   
+#   
+#   
+#   # vm<-R2(PLS$res,estimate='CV',ncomp=1:input$n_comp,intercept=FALSE)$val[1,,]*100
+#   # rmsep<-RMSEP(PLS$res,intercep=FALSE)
+#   # op<-par(pty='s',mfrow=c(1,2))
+#   # plot(rmsep$val[1,,],xlab='Number of Components',ylab='RMSECV',main='');grid()
+#   # lines(rmsep$val[1,,])
+#   # vm<-R2(PLS$res,estimate='CV',ncomp=1:input$n_comp,intercept=FALSE)$val[1,,]*100
+#   # plot(vm,xlab='Number of Components',ylab='CV % Explained Variance',ylim=c(min(0,min(vm)),100));grid()#
+#   # lines(vm)
+#   # par(op)
+# })
+# 
 
 # PLS - Exp vs calc -------------------------------------------------------------
 
@@ -1067,7 +1100,7 @@ output$pls_expvsfitted_label <- renderUI({
 })
 
 output$pls_expvsfitted_col <- renderUI({
-  req(!is.null(PLS$res_df))
+  req(!is.null(PLS$res))
   req(!is.null(dati$var_ql))
   pickerInput("pls_expvsfitted_col", label = "Color variable",
               choices = dati$var_ql,
@@ -1085,12 +1118,12 @@ output$pls_expvsfitted_col <- renderUI({
 # })
 
 output$pls_expvsfitted_rnames <- renderUI({
-  req(!is.null(PLS$res_df))
+  req(!is.null(PLS$res))
   checkboxInput("pls_expvsfitted_rnames", label = "Row names", value = FALSE)
 })
 
 output$pls_expvsfitted <- renderPlot({
-  req(!is.null(PLS$res_df))
+  req(!is.null(PLS$res))
   req(!is.null(dati$DS))
   req(!is.null(input$pls_expvsfitted_rnames))
   
@@ -1110,20 +1143,20 @@ output$pls_expvsfitted <- renderPlot({
   }else{
     ms<-dati$DS[,input$var_y]
     op<-par(pty='s',mfrow=c(1,2))
-    ft<-PLS$resf$fitted.values[,,as.numeric(input$n_comp_df)]
+    ft<-PLS$resf$fitted.values[,,as.numeric(input$pls_n_comp_df)]
     yl<-c(min(ft,ms),max(ft,ms))
     plot(ms,ft,xlab='Experimental Value',ylab='Fitted Value',xlim=yl,ylim=yl,
-         main=paste('Model with',input$n_comp_df,'Comp.'),type='n')
+         main=paste('Model with',input$pls_n_comp_df,'Comp.'),type='n')
     lines(par('usr')[1:2],par('usr')[3:4]);grid()
     if((is.null(g))&(is.null(tex)))points(ms,ft,col='black')
     if((!is.null(g))&(is.null(tex)))points(ms,ft,col=vcolor[as.numeric(g)])
     if((is.null(g))&(!is.null(tex)))text(ms,ft,as.character(tex),cex=0.7)
     if((!is.null(g))&(!is.null(tex)))text(ms,ft,as.character(tex),col=vcolor[as.numeric(g)],cex=0.7)
     
-    ft<-PLS$res_df$validation$pred[,,as.numeric(input$n_comp_df)]
+    ft<-PLS$res$validation$pred[,,as.numeric(input$pls_n_comp_df)]
     yl<-c(min(ft,ms),max(ft,ms))
     plot(ms,ft,xlab='Experimental Value',ylab='CV Value',xlim=yl,ylim=yl,
-         main=paste('Model with',PLS$ncomp,'Comp.'),type='n')
+         main=paste('Model with',PLS$pls_ncomp,'Comp.'),type='n')
     lines(par('usr')[1:2],par('usr')[3:4]);grid()
     if((is.null(g))&(is.null(tex)))points(ms,ft,col='black')
     if((!is.null(g))&(is.null(tex)))points(ms,ft,col=vcolor[as.numeric(g)])
@@ -1136,8 +1169,8 @@ output$pls_expvsfitted <- renderPlot({
 output$pls_fitting_dwl <- downloadHandler(
   filename = "fitted.xlsx", 
   content = function(file) {
-    ft<-PLS$resf$fitted.values[,,as.numeric(input$n_comp_df)]
-    ft_cv<-PLS$res_df$validation$pred[,,as.numeric(input$n_comp_df)]
+    ft<-PLS$resf$fitted.values[,,as.numeric(input$pls_n_comp_df)]
+    ft_cv<-PLS$res$validation$pred[,,as.numeric(input$pls_n_comp_df)]
     df<-cbind.data.frame('Fitted Value'=ft,'CV Value'=ft_cv)
     write.xlsx(df, file,colNames=TRUE)
   })
@@ -1158,7 +1191,7 @@ output$pls_res_label <- renderUI({
 })
 
 output$pls_res_col <- renderUI({
-  req(!is.null(PLS$res_df))
+  req(!is.null(PLS$res))
   req(!is.null(dati$var_ql))
   pickerInput("pls_res_col", label = "Color variable",
               choices = dati$var_ql,
@@ -1176,12 +1209,12 @@ output$pls_res_col <- renderUI({
 # })
 
 output$pls_res_rnames <- renderUI({
-  req(!is.null(PLS$res_df))
+  req(!is.null(PLS$res))
   checkboxInput("pls_res_rnames", label = "Row names", value = FALSE)
 })
 
 output$pls_res_plot <- renderPlot({
-  req(!is.null(PLS$res_df))
+  req(!is.null(PLS$res))
   req(!is.null(dati$DS))
   req(!is.null(input$pls_res_rnames))
   
@@ -1201,17 +1234,17 @@ output$pls_res_plot <- renderPlot({
   }else{
     ms<-dati$DS[,input$var_y]
     op<-par(pty='s',mfrow=c(1,2))
-    rs<-PLS$resf$fitted.values[,,as.numeric(input$n_comp_df)]-ms
+    rs<-PLS$resf$fitted.values[,,as.numeric(input$pls_n_comp_df)]-ms
     plot(1:length(rs),rs,type='n',xlab='Object Number',ylim=c(min(0,rs),max(0,rs)),
-         ylab=paste('Residuals in Fitting with ',as.numeric(input$n_comp_df),' Comp.'));grid();
+         ylab=paste('Residuals in Fitting with ',as.numeric(input$pls_n_comp_df),' Comp.'));grid();
     abline(h=0,col="red")
     if((is.null(g))&(is.null(tex)))points(1:length(rs),rs,col='black')
     if((!is.null(g))&(is.null(tex)))points(1:length(rs),rs,col=vcolor[as.numeric(g)],pch=16)
     if((is.null(g))&(!is.null(tex)))text(1:length(rs),rs,as.character(tex),cex=0.8,pch=16)
     if((!is.null(g))&(!is.null(tex)))text(1:length(rs),rs,as.character(tex),
                                           col=vcolor[as.numeric(g)],cex=0.8)
-    rs<-PLS$res_df$validation$pred[,,as.numeric(input$n_comp_df)]-ms
-    plot(1:length(rs),rs,xlab='Object Number',ylab=paste('Residuals in CV with ',input$n_comp_df,
+    rs<-PLS$res$validation$pred[,,as.numeric(input$pls_n_comp_df)]-ms
+    plot(1:length(rs),rs,xlab='Object Number',ylab=paste('Residuals in CV with ',input$pls_n_comp_df,
                                                          ' Comp.'),type='n',ylim=c(min(0,rs),max(0,rs)));grid()
     abline(h=0,col="red")
     if((is.null(g))&(is.null(tex)))points(1:length(rs),rs,col='black')
@@ -1229,618 +1262,149 @@ output$pls_res_dwl <- downloadHandler(
   filename = "residuals.xlsx", 
   content = function(file) {
     ms<-dati$DS[,input$var_y]
-    rs<-PLS$resf$fitted.values[,,as.numeric(input$n_comp_df)]-ms
-    rs_cv<-PLS$res_df$validation$pred[,,as.numeric(input$n_comp_df)]-ms
+    rs<-PLS$resf$fitted.values[,,as.numeric(input$pls_n_comp_df)]-ms
+    rs_cv<-PLS$res$validation$pred[,,as.numeric(input$pls_n_comp_df)]-ms
     df<-cbind.data.frame('Residuals'=rs,'Residuals in CV'=rs_cv)
     write.xlsx(df, file,colNames=TRUE)
   })
 
 
-# PCA - scores plots -------------------------------------------------------
+# PLS - scores plots -------------------------------------------------------
 
-# output$pca_score_compx <- renderUI({
-#   req(!is.null(PCA$res))
-#   selectInput("pca_score_compx", label = "Component on x-axis", 
-#               choices = 1:PCA$res@nPcs, 
-#               selected = 1)
-# })
-# 
-# output$pca_score_compy <- renderUI({
-#   req(!is.null(PCA$res))
-#   selectInput("pca_score_compy", label = "Component on y-axis", 
-#               choices = 1:PCA$res@nPcs, 
-#               selected = 2)
-# })
+output$pls_score_compx <- renderUI({
+  req(!is.null(PLS$res))
+  selectInput("pls_score_compx", label = "Component on x-axis",
+              choices = 1:as.numeric(input$pls_n_comp_df),
+              selected = 1)
+})
 
-# output$pca_score_compz <- renderUI({
-#   req(!is.null(PCA$res))
-#   req(input$pca_radio_score_type=='3d')
-#   selectInput("pca_score_compz", label = "Component on z-axis", 
-#               choices = c(1:PCA$res@nPcs), 
-#               selected = 3)
-# })
+output$pls_score_compy <- renderUI({
+  req(!is.null(PLS$res))
+  selectInput("pls_score_compy", label = "Component on y-axis",
+              choices = 1:as.numeric(input$pls_n_comp_df),
+              selected = 2)
+})
 
-# output$pca_score_line <- renderUI({
-#   req(!is.null(PCA$res))
-#   req(input$pca_radio_score_type=='2d')
-#   checkboxInput("pca_score_line", label = "Line", value = FALSE)
-# })
+output$pls_score_label <- renderUI({
+  req(!is.null(PLS$res))
+  req(!is.null(dati$var_ql))
+  pickerInput("pls_score_label", label = "Label variable",
+              choices = dati$var_ql,
+              options =  list(
+                "max-options" = 1,
+                "max-options-text" = "No more!"
+              ),
+              multiple = TRUE)
+})
 
+output$pls_score_col <- renderUI({
+  req(!is.null(PLS$res))
+  req(!is.null(dati$var_ql))
+  pickerInput("pls_score_col", label = "Color variable",
+              choices = dati$var_ql,
+              options =  list(
+                "max-options" = 1,
+                "max-options-text" = "No more!"
+              ),
+              multiple = TRUE)
+})
 
+output$pls_score_rnames <- renderUI({
+  req(!is.null(PLS$res))
+  checkboxInput("pls_score_rnames", label = "Row names", value = FALSE)
+})
 
-# output$pca_score_chull <- renderUI({
-#   req(!is.null(PCA$res))
-#   req(!is.null(dati$var_ql))
-#   req(input$pca_radio_score_type=='2d')
-#   pickerInput("pca_score_chull", label = "Convex Hull variable",
-#               choices = dati$var_ql,
-#               options =  list(
-#                 "max-options" = 1,
-#                 "max-options-text" = "No more!"
-#               ),
-#               multiple = TRUE)
-# })
+output$pls_scores_plot <- renderPlot({
+  req(!is.null(PLS$res))
+  req(!is.null(dati$DS))
+  req(!is.null(input$pls_score_rnames))
+      n1<-as.numeric(input$pls_score_compx)
+      n2<-as.numeric(input$pls_score_compy)
+        Ms<-PLS$res$scores
+        if(input$pls_res_scale==1){
+          yl<-c(min(Ms[,n1],Ms[,n2]),max(Ms[,n1],Ms[,n2]))
+          xl<-yl
+        }else{ 
+          yl<-c(min(Ms[,n2]),max(Ms[,n2]))
+          xl<-c(min(Ms[,n1]),max(Ms[,n1]))
+        }
+        tex<-NULL;grade<-NULL
+        if(!is.null(input$pls_score_label))tex<-dati$DS[,input$pls_score_label]
+        if(input$pls_score_rnames)tex<-rownames(dati$DS)
+        if(!is.null(input$pls_score_col)){
+          grade<-dati$DS[,input$pls_score_col]
+          grade<-factor(grade)
+          lev<-levels(grade)
+          nl<-nlevels(grade)
+          vcolor<-unlist(dovc(as.character(lev)))
+          }
+        V <- explvar(PLS$res) 
+        if(is.null(tex) & is.null(grade)){
+          plot(Ms[,n1],Ms[,n2],
+               xlab=paste('Component ',n1,' (',as.character(round(V[n1],1)),'% of variance)',sep=''),
+               ylab=paste('Component ',n2,' (',as.character(round(V[n2],1)),'% of variance)',sep=''),
+               xlim=xl,ylim=yl,pty='o',col='black');grid()
+        }
+        if(!is.null(tex)& is.null(grade)){
+          plot(Ms[,n1],Ms[,n2],type='n',
+               xlab=paste('Component ',n1,' (',as.character(round(V[n1],1)),'% of variance)',sep=''),
+               ylab=paste('Component ',n2,' (',as.character(round(V[n2],1)),'% of variance)',sep=''),
+               xlim=xl,ylim=yl);grid()
+          text(Ms[,n1],Ms[,n2],as.character(tex),col='black',cex=0.8)
+        }
+        if(is.null(tex)&!is.null(grade)){
+          plot(Ms[,n1],Ms[,n2],type='n',
+               xlab=paste('Component ',n1,' (',as.character(round(V[n1],1)),'% of variance)',sep=''),
+               ylab=paste('Component ',n2,' (',as.character(round(V[n2],1)),'% of variance)',sep=''),
+               xlim=xl,ylim=yl);grid()
+          for(i in 1:nl){
+            points(subset(Ms[,c(n1,n2)],grade==lev[i]),pch=19,col=vcolor[i])
+          }
+          rm(lev,nl,vcolor)
+        }
+        if(!is.null(tex)& !is.null(grade)){
+          plot(Ms[,n1],Ms[,n2],type='n',
+               xlab=paste('Component ',n1,' (',as.character(round(V[n1],1)),'% of variance)',sep=''),
+               ylab=paste('Component ',n2,' (',as.character(round(V[n2],1)),'% of variance)',sep=''),
+               xlim=xl,ylim=yl);grid()
+          for(i in 1:nl){
+            text(subset(Ms[,c(n1,n2)],grade==lev[i]),as.character(subset(tex,grade==lev[i])),
+                 col=vcolor[i],cex=0.8)
+          }
+        }
+        text(0,0,'+',cex=1.2,col='red')
+})
 
-
-# 
-# output$pca_score_chull_fatt <- renderUI({
-#   req(!is.null(input$pca_score_chull))
-#   req(is.numeric(dati$DS[,input$pca_score_chull]))
-#   checkboxInput("pca_score_chull_fatt", label = "Convex Hull variable is qualitative", value = FALSE)
-# })
-# 
-# output$pca_score_ell <- renderUI({
-#   req(!is.null(PCA$res))
-#   req(input$pca_radio_score_type=='2d')
-#   checkboxInput("pca_score_ell", label = "Ellipses", value = FALSE)
-# })
-
-
-# 
-# output$scores_pl <- renderPlot({
-#   req(!is.null(PCA$res))
-#   require(lattice)
-#   require(latticeExtra)
-#   if(input$pca_radio_score_type=='2d'){
-#     req(!is.null(input$pca_score_rnames))
-#     req(!is.null(input$pca_score_ell))
-#     req(!is.null(input$pca_score_line))
-#     require(lattice)
-#     
-#     lab<-input$pca_score_label
-#     if(is.null(input$pca_score_label))lab <- 'None'
-#     col<-input$pca_score_col
-#     if(is.null(input$pca_score_col))col <- 'None'
-#     c_hull<-input$pca_score_chull
-#     if(is.null(input$pca_score_chull))c_hull <- 'None'
-#     if(is.null(input$pca_score_col_fatt)) col.fatt <- FALSE
-#     if(!is.null(input$pca_score_col_fatt)) col.fatt <- input$pca_score_col_fatt
-#     if(is.null(input$pca_score_chull_fatt)) chull.fatt <- FALSE
-#     if(!is.null(input$pca_score_chull_fatt)) chull.fatt <- input$pca_score_chull_fatt
-#     
-#     ans <- list()
-#     ans[[1]] <- as.numeric(input$pca_score_compx)
-#     ans[[2]] <- as.numeric(input$pca_score_compy)
-#     ans[[3]] <- lab
-#     ans[[4]] <- col
-#     ans[[5]] <- input$pca_score_rnames
-#     ans[[6]] <- input$pca_score_ell
-#     ans[[7]] <- input$pca_score_line
-#     
-#     c1<-as.numeric(ans[[1]])
-#     c2<-as.numeric(ans[[2]])
-#     tex<-NULL;grade<-NULL
-#     if(as.logical(ans[[5]]))tex<-rownames(PCA$dataset)
-#     if(ans[[5]])tex<-rownames(PCA$dataset)
-#     if(as.character(ans[[3]])!='None')tex<-dati$DS[,lab]
-#     if(as.character(ans[[4]])!='None')grade<-dati$DS[,col]
-#     if(col.fatt)grade<-as.factor(dati$DS[,col])
-#     
-#     if(!is.null(grade)){
-#       tog<-typeof(grade)
-#       if(is.factor(grade))tog<-"factor"
-#       grade<-factor(grade)
-#       lev<-levels(grade)
-#       nl<-nlevels(grade)
-#       if(tog=="double")vcolor<-unlist(dovc(as.numeric(lev)))
-#       if(tog=="factor")vcolor<-unlist(dovc(as.character(lev)))
-#       if(tog=="character")vcolor<-unlist(dovc(as.character(lev)))
-#       if(tog=="integer")vcolor<-unlist(dovc(as.numeric(lev)))
-#     }
-#     S<-PCA$res@scores
-#     V<-PCA$res@R2
-#     r<-nrow(S)
-#     siz=.9-log10(r)/10 # defines the size of the characters in the plots, based on the number of samples
-#     
-#     c<-nrow(PCA$res@loadings)
-#     if(!PCA$scale)c <- sum(apply(PCA$dataset,2,'var'))
-#     
-#     DeltaS1lim=(max(S[,c1])-min(S[,c1]))
-#     DeltaS2lim=(max(S[,c2])-min(S[,c2]))
-#     
-#     if (DeltaS1lim>DeltaS2lim){
-#       Delta<-DeltaS1lim-DeltaS2lim
-#       S1lim<-c(min(S[,c1])-DeltaS1lim*0.05,max(S[,c1])+DeltaS1lim*0.05)
-#       S2lim<-c(min(S[,c2])-Delta/2-DeltaS1lim*0.05,max(S[,c2])+Delta/2+DeltaS1lim*0.05)
-#     }
-#     if (DeltaS2lim>DeltaS1lim){
-#       Delta<-DeltaS2lim-DeltaS1lim
-#       S1lim<-c(min(S[,c1])-Delta/2-DeltaS2lim*0.05,max(S[,c1])+Delta/2+DeltaS2lim*0.05)
-#       S2lim<-c(min(S[,c2])-DeltaS2lim*0.05,max(S[,c2])+DeltaS2lim*0.05)
-#     }
-#     
-#     if(PCA$type=='pca'){
-#       xl<-paste('Component ',as.character(c1),' (',as.character(round(V[c1]*100,1)),'% of variance)',sep='')
-#       yl<-paste('Component ',as.character(c2),' (',as.character(round(V[c2]*100,1)),'% of variance)',sep='')
-#     }else{
-#       xl<-paste('Factor ',as.character(c1),' (',as.character(round(V[c1]*100,1)),'% of variance)',sep='')
-#       yl<-paste('Factor ',as.character(c2),' (',as.character(round(V[c2]*100,1)),'% of variance)',sep='')}
-#     tl=paste('Score Plot (',as.character(round((V[c1]+V[c2])*100,1)),'% of total variance)',sep='')
-#     
-#     if(!is.null(grade)){
-#       if(tog=="double" | tog=="integer"){
-#         tl=paste('Score Plot (',as.character(round((V[c1]+V[c2])*100,1)),'% of total variance) \n color scale: ',col,sep='')
-#         # if(!variable$control==1)tl=paste('Score Plot (',as.character(round((V[c1]+V[c2])*100,1)),'% of total variance) \n color scale: ',
-#         #                                  colnames(eval(parse(text=variable$name),envir=.GlobalEnv))[as.numeric(sub("]","",sub(".*\\[,", "", variable$surname)))],sep='')
-#       }
-#     }
-#     
-#     panel.score<-function(x,y,...){
-#       panel.xyplot(x,y,...)
-#       panel.grid(h=-1, v=-1,lty = 3,col = "grey80")
-#       panel.text(x,y,...) 
-#       panel.text(0,0,'+',cex=1.2,col='red')
-#     }
-#     
-#     panel.score.ell<-function(x,y,e1,e2,r,c,...){
-#       panel.xyplot(x,y,...)
-#       panel.grid(h=-1, v=-1,lty = 3,col = "grey80")
-#       panel.text(x,y,...) 
-#       panel.text(0,0,'+',cex=1.2,col='red')
-#       
-#       rad1=sqrt((e1*((r-1)/r)*c)*qf(.95,2,r-2)*2*(r^2-1)/(r*(r-2))); 
-#       rad2=sqrt((e2*((r-1)/r)*c)*qf(.95,2,r-2)*2*(r^2-1)/(r*(r-2)));
-#       theta <- seq(0, 2 * pi, length=1000)
-#       x <- rad1 * cos(theta)
-#       y <- rad2 * sin(theta)
-#       panel.xyplot(x,y, type = "l",col='red',xlab='',ylab='')
-#       
-#       rad1=sqrt((e1*((r-1)/r)*c)*qf(.99,2,r-2)*2*(r^2-1)/(r*(r-2))); 
-#       rad2=sqrt((e2*((r-1)/r)*c)*qf(.99,2,r-2)*2*(r^2-1)/(r*(r-2)));
-#       theta <- seq(0, 2 * pi, length=1000)
-#       x <- rad1 * cos(theta)
-#       y <- rad2 * sin(theta)
-#       panel.xyplot(x, y, type = "l",col='red',xlab='',ylab='',lty=2)
-#       
-#       rad1=sqrt((e1*((r-1)/r)*c)*qf(.999,2,r-2)*2*(r^2-1)/(r*(r-2))); 
-#       rad2=sqrt((e2*((r-1)/r)*c)*qf(.999,2,r-2)*2*(r^2-1)/(r*(r-2)));
-#       theta <- seq(0, 2 * pi, length=1000)
-#       x <- rad1 * cos(theta)
-#       y <- rad2 * sin(theta)
-#       panel.xyplot(x,y, type = "l",col='red',xlab='',ylab='',lty=3)
-#       
-#       rm(rad1,rad2,theta,x,y)
-#     }
-#     
-#     if(is.null(tex) & is.null(grade)){
-#       if(!as.logical(ans[[6]])){
-#         .G_<-xyplot(S[,c2]~S[,c1],xlim=S1lim,ylim=S2lim,
-#                     pty='o',xlab=xl,ylab=yl,main=tl,col='black',cex=siz,labels=NULL,
-#                     panel=panel.score)
-#         if(ans[[7]]).G_<-update(.G_,type='b')
-#         .G_<-update(.G_,asp=1)
-#         # print(.G_)
-#       } else {
-#         .G_<-xyplot(S[,c2]~S[,c1],xlim=S1lim,ylim=S2lim,
-#                     pty='o',xlab=xl,ylab=yl,main=tl,col='black',cex=siz,
-#                     labels=NULL,panel=panel.score.ell,
-#                     e1=V[c1],e2=V[c2],r=r,c=c,
-#                     sub="Ellipses: critical T^2 value at p=0.05, 0.01 and 0.001",
-#                     par.settings = list(par.sub.text = list(cex = 0.6,col = "red")))
-#         if(ans[[7]]).G_<-update(.G_,type='b')
-#         .G_<-update(.G_,asp=1)
-#         # print(.G_)
-#       }
-#     }
-#     
-#     if(!is.null(tex)& is.null(grade)){
-#       if(!as.logical(ans[[6]])){
-#         .G_<-xyplot(S[,c2]~S[,c1],xlim=S1lim,ylim=S2lim,xlab=xl,ylab=yl,main=tl,
-#                     type='n',
-#                     labels=tex,cex=siz,panel=panel.score)
-#         if(ans[[7]]).G_<-update(.G_,type='l')
-#         .G_<-update(.G_,asp=1)
-#         # print(.G_)
-#       } else{
-#         .G_<-xyplot(S[,c2]~S[,c1],xlim=S1lim,ylim=S2lim,xlab=xl,ylab=yl,main=tl,
-#                     type='n',
-#                     labels=tex,cex=siz,panel=panel.score.ell,
-#                     e1=V[c1],e2=V[c2],r=r,c=c,
-#                     sub="Ellipses: critical T^2 value at p=0.05, 0.01 and 0.001",
-#                     par.settings = list(par.sub.text = list(cex = 0.6,col = "red")))
-#         if(ans[[7]]).G_<-update(.G_,type='l')
-#         .G_<-update(.G_,asp=1)
-#         # print(.G_)
-#       }
-#     }
-#     
-#     if(is.null(tex)& !is.null(grade)){
-#       if(tog=="character" | tog=="factor"){
-#         if(!as.logical(ans[[6]])){
-#           .G_<-xyplot(S[,c2]~S[,c1],xlim=S1lim,ylim=S2lim,xlab=xl,ylab=yl,main=tl,
-#                       col=vcolor[grade],pch=19,cex=siz,labels=NULL,
-#                       key=list(columns=min(nl,4),cex=0.8,text=list(lev),
-#                                points=list(pch=19,col=vcolor)),panel=panel.score)
-#           if(ans[[7]]).G_<-update(.G_,type='b')
-#           .G_<-update(.G_,asp=1)
-#           # print(.G_)
-#         } else {
-#           .G_<-xyplot(S[,c2]~S[,c1],xlim=S1lim,ylim=S2lim,xlab=xl,ylab=yl,main=tl,
-#                       col=vcolor[grade],pch=19,cex=siz,labels=NULL,
-#                       key=list(columns=min(nl,4),cex=0.8,text=list(lev),
-#                                points=list(pch=19,col=vcolor)),panel=panel.score.ell,
-#                       e1=V[c1],e2=V[c2],r=r,c=c,
-#                       sub="Ellipses: critical T^2 value at p=0.05, 0.01 and 0.001",
-#                       par.settings = list(par.sub.text = list(cex = 0.6,col = "red")))
-#           if(ans[[7]]).G_<-update(.G_,type='b')
-#           .G_<-update(.G_,asp=1)
-#           # print(.G_)
-#         }
-#       }
-#       
-#       if(tog=="double" | tog=="integer"){
-#         
-#         panel.levelplot.points<-function (x, y, z, subscripts = TRUE, at = pretty(z), shrink, 
-#                                           labels, label.style, contour, region, pch = 21, col.symbol = "#00000044", 
-#                                           ..., col.regions = regions$col, fill = NULL){
-#           regions <- trellis.par.get("regions")
-#           zcol <- level.colors(z, at, col.regions, colors = TRUE)
-#           x <- x[subscripts]
-#           y <- y[subscripts]
-#           zcol <- zcol[subscripts]
-#           panel.xyplot(x, y, fill = zcol, pch = pch, col.symbol = col.symbol, 
-#                        ...)
-#           panel.grid(h=-1, v=-1,lty = 3,col = "grey")
-#           panel.text(0,0,'+',cex=1.2,col='red')
-#         }
-#         
-#         
-#         panel.levelplot.points.ell<-function (x, y, z,e1,e2,cl,row, subscripts = TRUE, at = pretty(z), shrink, 
-#                                               labels, label.style, contour, region, pch = 21, col.symbol = "#00000044", 
-#                                               col.regions = regions$col, fill = NULL,...){
-#           regions <- trellis.par.get("regions")
-#           zcol <- level.colors(z, at, col.regions, colors = TRUE)
-#           x <- x[subscripts]
-#           y <- y[subscripts]
-#           zcol <- zcol[subscripts]
-#           panel.xyplot(x, y, fill = zcol, pch = pch, col.symbol = col.symbol, 
-#                        ...)
-#           panel.grid(h=-1, v=-1,lty = 3,col = "grey")
-#           panel.text(0,0,'+',cex=1.2,col='red')
-#           
-#           rad1=sqrt((e1*((row-1)/row)*cl)*qf(.95,2,row-2)*2*(row^2-1)/(row*(row-2))); 
-#           rad2=sqrt((e2*((row-1)/row)*cl)*qf(.95,2,row-2)*2*(row^2-1)/(row*(row-2)));
-#           theta <- seq(0, 2 * pi, length=1000)
-#           x <- rad1 * cos(theta)
-#           y <- rad2 * sin(theta)
-#           panel.xyplot(x,y, type = "l",col='red',xlab='',ylab='')
-#           
-#           rad1=sqrt((e1*((row-1)/row)*cl)*qf(.99,2,row-2)*2*(row^2-1)/(row*(row-2))); 
-#           rad2=sqrt((e2*((row-1)/row)*cl)*qf(.99,2,row-2)*2*(row^2-1)/(row*(row-2)));
-#           theta <- seq(0, 2 * pi, length=1000)
-#           x <- rad1 * cos(theta)
-#           y <- rad2 * sin(theta)
-#           panel.xyplot(x, y, type = "l",col='red',xlab='',ylab='',lty=2)
-#           
-#           rad1=sqrt((e1*((row-1)/row)*cl)*qf(.999,2,row-2)*2*(row^2-1)/(row*(row-2))); 
-#           rad2=sqrt((e2*((row-1)/row)*cl)*qf(.999,2,row-2)*2*(row^2-1)/(row*(row-2)));
-#           theta <- seq(0, 2 * pi, length=1000)
-#           x <- rad1 * cos(theta)
-#           y <- rad2 * sin(theta)
-#           panel.xyplot(x,y, type = "l",col='red',xlab='',ylab='',lty=3)
-#           
-#           rm(rad1,rad2,theta,x,y)
-#         }
-#         
-#         if(!as.logical(ans[[6]])){
-#           
-#           .G_<-levelplot(dati$DS[,col] ~S[,c1]*S[,c2],xlim=S1lim,ylim=S2lim,
-#                          xlab=xl,ylab=yl,main=tl,col=vcolor[grade],pch=19,cex=siz,labels=NULL,
-#                          panel = panel.levelplot.points, col.regions = colorpanel(256,low = "blue",high = "red"),
-#                          at=seq(min(as.numeric(lev)),max(as.numeric(lev)),length.out=256),
-#                          #colorkey=list(labels=list(at=seq(min(as.numeric(lev)),max(as.numeric(lev)),
-#                          #                                     (max(as.numeric(lev)-min(as.numeric(lev))))/4),
-#                          #                          labels=round(seq(min(as.numeric(lev)),max(as.numeric(lev)),
-#                          #                                                 (max(as.numeric(lev)-min(as.numeric(lev))))/4),2)))
-#           )
-#           if(ans[[7]]).G_<-update(.G_,type='b')
-#           .G_<-update(.G_,asp=1)
-#           # print(.G_)
-#         } else {
-#           .G_<-levelplot(dati$DS[,col] ~S[,c1]*S[,c2],
-#                          e1=V[c1],e2=V[c2],row=r,cl=c,
-#                          xlim=S1lim,ylim=S2lim,xlab=xl,ylab=yl,main=tl,col=vcolor[grade],pch=19,cex=siz,
-#                          panel = panel.levelplot.points.ell, col.regions = colorpanel(256,low = "blue",high = "red"),
-#                          at=seq(min(as.numeric(lev)),max(as.numeric(lev)),length.out=256),
-#                          #colorkey=list(labels=list(at=seq(min(as.numeric(lev)),max(as.numeric(lev)),
-#                          #                                       (max(as.numeric(lev)-min(as.numeric(lev))))/4),
-#                          #                          labels=round(seq(min(as.numeric(lev)),max(as.numeric(lev)),
-#                          #                                                  (max(as.numeric(lev)-min(as.numeric(lev))))/4),2))),
-#                          sub="Ellipses: critical T^2 value at p=0.05, 0.01 and 0.001",
-#                          par.settings = list(par.sub.text = list(cex = 0.6,col = "red")))
-#           if(ans[[7]]).G_<-update(.G_,type='b')
-#           .G_<-update(.G_,asp=1)
-#           # print(.G_)
-#         }
-#         if (exists("panel.levelplot.points")) rm(panel.levelplot.points)
-#         if (exists("panel.levelplot.points.ell")) rm(panel.levelplot.points.ell)
-#       }
-#       rm(lev,nl,vcolor)
-#     }
-#     
-#     if(!is.null(tex)& !is.null(grade)){
-#       if(tog=="character" | tog=="factor"){
-#         if(!as.logical(ans[[6]])){
-#           .G_<-xyplot(S[,c2]~S[,c1],xlim=S1lim,ylim=S2lim,xlab=xl,ylab=yl,labels=tex,
-#                       main=tl,col=vcolor[grade],type='n',cex=siz,panel=panel.score,
-#                       key=list(columns=min(nl,4),cex=0.8,text=list(lev),points=list(pch=19,col=vcolor)))
-#           if(ans[[7]]).G_<-update(.G_,type='l')
-#           .G_<-update(.G_,asp=1);print(.G_)
-#         } else {
-#           .G_<-xyplot(S[,c2]~S[,c1],xlim=S1lim,ylim=S2lim,xlab=xl,ylab=yl,labels=tex,
-#                       main=tl,col=vcolor[grade],type='n',cex=siz,panel=panel.score.ell,
-#                       key=list(columns=min(nl,4),cex=0.8,text=list(lev),points=list(pch=19,col=vcolor)),
-#                       e1=V[c1],e2=V[c2],r=r,c=c,
-#                       sub="Ellipses: critical T^2 value at p=0.05, 0.01 and 0.001",
-#                       par.settings = list(par.sub.text = list(cex = 0.6,col = "red")))
-#           if(ans[[7]]).G_<-update(.G_,type='l')
-#           .G_<-update(.G_,asp=1)
-#           # print(.G_)
-#         }
-#       }
-#       
-#       if(tog=="double" | tog=="integer"){
-#         panel.levelplot.points<-function (x, y, z, subscripts = TRUE, at = pretty(z), shrink, 
-#                                           labels, label.style, contour, region, pch = 21, col.symbol = "#00000044", 
-#                                           ..., col.regions = regions$col, fill = NULL){
-#           regions <- trellis.par.get("regions")
-#           zcol <- level.colors(z, at, col.regions, colors = TRUE)
-#           x <- x[subscripts]
-#           y <- y[subscripts]
-#           zcol <- zcol[subscripts]
-#           panel.xyplot(x, y, fill = zcol, pch = pch, col.symbol = col.symbol, 
-#                        ...)
-#           panel.text(x,y,col=zcol,labels,...)
-#           panel.grid(h=-1, v=-1,lty = 3,col = "grey")
-#           panel.text(0,0,'+',cex=1.2,col='red')
-#         }
-#         
-#         panel.levelplot.points.ell<-function (x, y, z, e1,e2,row,cl, subscripts = TRUE, at = pretty(z), shrink, 
-#                                               labels, label.style, contour, region, pch = 21, col.symbol = "#00000044", 
-#                                               ..., col.regions = regions$col, fill = NULL){
-#           regions <- trellis.par.get("regions")
-#           zcol <- level.colors(z, at, col.regions, colors = TRUE)
-#           x <- x[subscripts]
-#           y <- y[subscripts]
-#           zcol <- zcol[subscripts]
-#           panel.xyplot(x, y, fill = zcol, pch = pch, col.symbol = col.symbol, 
-#                        ...)
-#           panel.text(x,y,col=zcol,labels,...)
-#           panel.grid(h=-1, v=-1,lty = 3,col = "grey")
-#           panel.text(0,0,'+',cex=1.2,col='red')
-#           
-#           rad1=sqrt((e1*((row-1)/row)*cl)*qf(.95,2,row-2)*2*(row^2-1)/(row*(row-2))); 
-#           rad2=sqrt((e2*((row-1)/row)*cl)*qf(.95,2,row-2)*2*(row^2-1)/(row*(row-2)));
-#           theta <- seq(0, 2 * pi, length=1000)
-#           x <- rad1 * cos(theta)
-#           y <- rad2 * sin(theta)
-#           panel.xyplot(x,y, type = "l",col='red',xlab='',ylab='')
-#           
-#           rad1=sqrt((e1*((row-1)/row)*cl)*qf(.99,2,row-2)*2*(row^2-1)/(row*(row-2))); 
-#           rad2=sqrt((e2*((row-1)/row)*cl)*qf(.99,2,row-2)*2*(row^2-1)/(row*(row-2)));
-#           theta <- seq(0, 2 * pi, length=1000)
-#           x <- rad1 * cos(theta)
-#           y <- rad2 * sin(theta)
-#           panel.xyplot(x, y, type = "l",col='red',xlab='',ylab='',lty=2)
-#           
-#           rad1=sqrt((e1*((row-1)/row)*cl)*qf(.999,2,row-2)*2*(row^2-1)/(row*(row-2))); 
-#           rad2=sqrt((e2*((row-1)/row)*cl)*qf(.999,2,row-2)*2*(row^2-1)/(row*(row-2)));
-#           theta <- seq(0, 2 * pi, length=1000)
-#           x <- rad1 * cos(theta)
-#           y <- rad2 * sin(theta)
-#           panel.xyplot(x,y, type = "l",col='red',xlab='',ylab='',lty=3)
-#           
-#           rm(rad1,rad2,theta,x,y)
-#         }
-#         
-#         if(!as.logical(ans[[6]])){
-#           .G_<-levelplot(dati$DS[,col] ~S[,c1]*S[,c2],xlim=S1lim,ylim=S2lim,xlab=xl,ylab=yl,main=tl,col=vcolor[grade],type='n',cex=siz,
-#                          panel = panel.levelplot.points, col.regions = colorpanel(256,low = "blue",high = "red"),labels=tex,
-#                          at=seq(min(as.numeric(lev)),max(as.numeric(lev)),length.out=256),
-#                          #colorkey=list(labels=list(at=seq(min(as.numeric(lev)),max(as.numeric(lev)),
-#                          #                                    (max(as.numeric(lev)-min(as.numeric(lev))))/4),
-#                          #                          labels=round(seq(min(as.numeric(lev)),max(as.numeric(lev)),
-#                          #                                                   (max(as.numeric(lev)-min(as.numeric(lev))))/4),2)))
-#           )
-#           if(ans[[7]]).G_<-update(.G_,type='l')
-#           .G_<-update(.G_,asp=1)
-#           # print(.G_)
-#         } else {
-#           .G_<-levelplot(dati$DS[,col] ~S[,c1]*S[,c2],xlim=S1lim,ylim=S2lim,xlab=xl,ylab=yl,main=tl,col=vcolor[grade],type='n',cex=siz,
-#                          panel = panel.levelplot.points.ell, col.regions = colorpanel(256,low = "blue",high = "red"),
-#                          at=seq(min(as.numeric(lev)),max(as.numeric(lev)),length.out=256),
-#                          #colorkey=list(labels=list(at=seq(min(as.numeric(lev)),max(as.numeric(lev)),
-#                          #                                      (max(as.numeric(lev)-min(as.numeric(lev))))/4),
-#                          #                          labels=round(seq(min(as.numeric(lev)),max(as.numeric(lev)),
-#                          #                                                 (max(as.numeric(lev)-min(as.numeric(lev))))/4),2))),
-#                          e1=V[c1],e2=V[c2],row=r,cl=c,labels=tex,
-#                          sub="Ellipses: critical T^2 value at p=0.05, 0.01 and 0.001",
-#                          par.settings = list(par.sub.text = list(cex = 0.6,col = "red")))
-#           if(ans[[7]]).G_<-update(.G_,type='l')
-#           .G_<-update(.G_,asp=1)
-#           # print(.G_)
-#         }
-#         if (exists("panel.levelplot.points")) rm(panel.levelplot.points)
-#         if (exists("panel.levelplot.points.ell")) rm(panel.levelplot.points.ell)
-#       }
-#       # rm(lev,nl,vcolor)
-#     }
-# 
-#     if(as.character(c_hull)=='None')print(.G_)
-#     if(as.character(c_hull)!='None'){
-#       # variable<-makevar(chull)   
-#       grade<-dati$DS[,c_hull]
-#       if(chull.fatt)grade<-as.factor(dati$DS[,c_hull])
-#       # grade[is.na(grade)]='-'
-#       # grade[grade=='']='-'
-#       if(!is.null(grade)){
-#         tog<-typeof(grade)
-#         if(is.factor(grade))tog<-"factor"
-#         grade<-factor(grade)
-#         lev<-levels(grade)
-#         # if(tog=="factor")vcolor<-unlist(dovc(as.character(lev)))
-#         # if(tog=="character")vcolor<-unlist(dovc(as.character(lev)))
-#         if(tog=="factor"|tog=="character"){
-#           vcolor<-unlist(dovc(as.character(lev)))
-#           vcolor[lev=='-']="#00000000"
-#           if(ans[4]!='None'& ans[4][[1]]==ans[5][[1]]){
-#           # if(ans[4]!='None'){
-#             # variable<-makevar(ans[[4]])   
-#             grade<-dati$DS[,col]
-#             tog <- typeof(grade)
-#             if(tog=='factor'|tog=='character'){
-#               grade<-factor(grade)
-#               vcolor<-unlist(dovc(as.character(levels(grade))))
-#               vcolor[!levels(grade)%in%lev]="#00000000"
-#               lev<-levels(grade)
-#             }
-#           }
-#           
-#           i=0
-#           A<-".G_"
-#           len <- length(lev)
-#           S_L <- vector(mode = "list", length = len)
-#           CH <- vector(mode = "list", length = len)
-#           for(l in lev){
-#             i=i+1
-#             S_L[[i]]<-S[dati$DS[,c_hull]==l,c(c1,c2)]
-#             if(!is.matrix(S_L[[i]]))
-#               next
-#             hpts <- chull(S_L[[i]])
-#             hpts<- c(hpts, hpts[1])
-#             CH[[i]] <- hpts
-#             A<-paste0(A,"+xyplot(S_L[[",i,"]][CH[[",i,"]],2]~S_L[[",i,"]][CH[[",i,"]],1],type='l',col=vcolor[",which(l==lev),"])")
-#           }
-#           print(eval(parse(text=A)))
-#         }else{
-#           print(.G_)
-#         }
-#       }}
-#   }
-#   
-#   if(input$pca_radio_score_type=='3d'){
-#     # require(lattice)
-#     req(input$pca_score_compx,input$pca_score_compy,input$pca_score_compz)
-#     req(input$scores_pl3d_lv_z,input$scores_pl3d_lv_x)
-#     
-#     c1<-as.numeric(input$pca_score_compx)
-#     c2<-as.numeric(input$pca_score_compy)
-#     c3<-as.numeric(input$pca_score_compz)
-#     
-#     col<-input$pca_score_col
-#     if(is.null(input$pca_score_col))col <- 'None'
-#     grade<-NULL
-#     if(col!='None')grade<-dati$DS[,col]
-#     if(!is.null(grade)){
-#       tog<-typeof(grade)
-#       if(is.factor(grade))tog<-"factor"
-#       grade<-factor(grade)
-#       lev<-levels(grade)
-#       nl<-nlevels(grade)
-#       if(tog=="double")vcolor<-unlist(dovc(as.numeric(lev)))
-#       if(tog=="factor")vcolor<-unlist(dovc(as.character(lev)))
-#       if(tog=="character")vcolor<-unlist(dovc(as.character(lev)))
-#       if(tog=="integer")vcolor<-unlist(dovc(as.numeric(lev)))
-#     }
-#     S<-PCA$res@scores
-#     V<-PCA$res@R2
-#     r<-nrow(S)
-#     siz=.9-log10(r)/10 # defines the size of the characters in the plots, based on the number of samples
-#     c<-nrow(PCA$res@loadings)
-#     
-#     DeltaS1lim=0.01*(max(S[,c1])-min(S[,c1]))
-#     S1lim<-c(min(S[,c1])-DeltaS1lim,max(S[,c1])+DeltaS1lim)
-#     DeltaS2lim=0.01*(max(S[,c2])-min(S[,c2]))
-#     S2lim<-c(min(S[,c2])-DeltaS2lim,max(S[,c2])+DeltaS2lim)
-#     DeltaS3lim=0.01*(max(S[,c3])-min(S[,c3]))
-#     S3lim<-c(min(S[,c3])-DeltaS3lim,max(S[,c3])+DeltaS3lim)
-#     # dev.new(title="PCA 3D score plot")
-#     
-#     m<-min(c(S1lim,S2lim,S3lim))
-#     M<-max(c(S1lim,S2lim,S3lim))
-#     
-#     if(PCA$type=='pca'){
-#       xl<-paste('Comp. ',as.character(c1),' (',as.character(round(V[c1]*100,1)),'%)',sep='')
-#       yl<-paste('Comp. ',as.character(c2),' (',as.character(round(V[c2]*100,1)),'%)',sep='')
-#       zl<-paste('Comp. ',as.character(c3),' (',as.character(round(V[c3]*100,1)),'%)',sep='')
-#     }else{
-#       xl<-paste('Fact. ',as.character(c1),' (',as.character(round(V[c1]*100,1)),'%)',sep='')
-#       yl<-paste('Fact. ',as.character(c2),' (',as.character(round(V[c2]*100,1)),'%)',sep='')
-#       zl<-paste('Fact. ',as.character(c3),' (',as.character(round(V[c3]*100,1)),'%)',sep='')}
-#     tl=paste('Score Plot (',as.character(round((V[c1]+V[c2]+V[c3])*100,1)),'% of total variance)',sep='')
-#     
-#     Data<-as.data.frame(S[,c(c1,c2,c3)])
-#     # colnames(Data)<-c("x","y","z")
-#     # colnames(Data)[1]<-'x'
-#     # colnames(Data)[2]<-'y'
-#     # colnames(Data)[3]<-'z'
-#     
-#     if(is.null(grade)){
-#       score.3D<-cloud(S[,c3]~S[,c1]*S[,c2],data = Data,screen = list(z=input$scores_pl3d_lv_z,x=-input$scores_pl3d_lv_x),
-#                       xlim=c(m,M),ylim=c(m,M),zlim=c(m,M),xlab=list(xl,cex=0.8),ylab=list(yl,cex=0.8),zlab=list(zl,cex=0.8),
-#                       main=tl,cex=siz,col="black",pch=19);print(score.3D)
-#     }
-#     if(!is.null(grade)){
-#       if(tog=="character" | tog=="factor"){
-#         score.3D<-cloud(S[,c3]~S[,c1]*S[,c2],data = Data,screen = list(z = input$scores_pl3d_lv_z, x =-input$scores_pl3d_lv_x),
-#                         xlim=c(m,M),ylim=c(m,M),zlim=c(m,M),xlab=list(xl,cex=0.8),ylab=list(yl,cex=0.8),zlab=list(zl,cex=0.8),
-#                         main=tl,cex=siz,col=vcolor[grade],pch=19,
-#                         key=list(columns=min(nl,4),cex=0.8,text=list(lev),points=list(pch=19,col=vcolor)));print(score.3D)
-#       }
-#       if(tog=="double" | tog=="integer"){
-#         
-#         tl=paste('Score Plot (',as.character(round((V[c1]+V[c2]+V[c3])*100,1)),'% of total variance) \n color scale: ',col,sep='')
-#         # if(!variable$control==1)tl=paste('Score Plot (',as.character(round((V[c1]+V[c2]+V[c3])*100,1)),'% of total variance) \n color scale: ',
-#         #                                  colnames(eval(parse(text=variable$name),envir=.GlobalEnv))[as.numeric(sub("]","",sub(".*\\[,", "", variable$surname)))],sep='')
-#         
-#         score.3D<-cloud(S[,c3]~S[,c1]*S[,c2],data = Data,screen = list(z = input$scores_pl3d_lv_z, x =-input$scores_pl3d_lv_x),col=vcolor[grade],
-#                         drape=TRUE,
-#                         at=seq(min(as.numeric(lev)),max(as.numeric(lev)),length.out=256),
-#                         #colorkey=list(labels=list(at=seq(min(as.numeric(lev)),max(as.numeric(lev)),
-#                         #                                 (max(as.numeric(lev)-min(as.numeric(lev))))/4),
-#                         #                          labels=round(seq(min(as.numeric(lev)),max(as.numeric(lev)),
-#                         #                                                  (max(as.numeric(lev)-min(as.numeric(lev))))/4),2))),
-#                         col.regions =colorpanel(256,low = "blue",high = "red"),
-#                         xlim=c(m,M),ylim=c(m,M),zlim=c(m,M),xlab=list(xl,cex=0.8),ylab=list(yl,cex=0.8),zlab=list(zl,cex=0.8),
-#                         main=tl,cex=siz,pch=19);print(score.3D)
-#       }
-#       
-#       # rm(lev,nl,vcolor,tog)
-#     }
-#   }
-# })
+output$pls_score_dwl <- downloadHandler(
+  filename = "scores.xlsx",
+  content = function(file) {
+    df <- PLS$res$scores[,]
+    write.xlsx(df, file,colNames=TRUE)
+  })
 
 
 
 
-# output$scores_pl3d_lv_z<-renderUI({
-#   req(input$pca_radio_score_type=='3d')
-#   sliderInput('scores_pl3d_lv_z',label = 'Horizontal rotation',min = 0,max = 360,value = 30,step = 10)
-# })
-# output$scores_pl3d_lv_x<-renderUI({
-#   req(input$pca_radio_score_type=='3d')
-#   sliderInput('scores_pl3d_lv_x',label = 'Vertical rotation',min = 0,max = 90,value = 60,step = 10)
-# })
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # PCA - loading plots -----------------------------------------------------
 
