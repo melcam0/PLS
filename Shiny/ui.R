@@ -20,7 +20,7 @@ sidebar<- dashboardSidebar(
                 
                 menuItem(text = "PLS",icon = shiny::icon("expand-arrows-alt"),
                          menuItem("Model computation",tabName = "pls_CV"),
-                         menuItem("permutation test",tabName = "pls_permtation")),
+                         menuItem("Permutation test",tabName = "pls_permutation")),
                          
                 #          
                 #          
@@ -235,6 +235,36 @@ body<-dashboardBody(
               
               ),
 
+# PLS - permutation -------------------------------------------------------
+
+tabItem(tabName = "pls_permutation",
+        fluidPage(titlePanel("Permutation test"),
+                  column(12,
+                         
+                         numericInput("pls_n_prm", label = "Number of permutations", value = 1000),
+                         actionButton("bpls_perm", label = "Execute")
+                         
+                         
+                         # selectInput("pls_n_prm", label = "Number of permutations", 
+                         #             choices = 1:10000,
+                         #             selected = 50)
+                         
+                         
+                  ),
+                 column(12,
+                        br()),
+                  column(8,
+                         # verbatimTextOutput('a'),
+                         plotOutput('pls_perm_plot',height = "600px")),
+                  column(4,
+                         verbatimTextOutput('pls_perm_txt'))
+                  
+        )
+),
+
+
+
+
 # PLS - Exp vs calc -------------------------------------------------------------
 
 tabItem(tabName = "exp_calc",
@@ -249,8 +279,8 @@ tabItem(tabName = "exp_calc",
                          uiOutput('pls_expvsfitted_label'),
                          uiOutput('pls_expvsfitted_col'),
                          uiOutput('pls_expvsfitted_rnames'))
-                  )
-        ),
+        )
+),
 
 # PLS - residui -----------------------------------------------------------
 
@@ -287,6 +317,11 @@ tabItem(tabName = "scores",
                          uiOutput('pls_score_rnames'))
 
         )),
+
+
+
+
+
 
 
 

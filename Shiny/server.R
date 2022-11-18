@@ -155,6 +155,7 @@ server <- function (input , output, session ){
     PLS$resf<-NULL
     PLS$R_sq <- NULL
     PLS$D <- NULL
+    PLS$D_perm <- NULL
 
     graf$xlim=NULL
     graf$xylim=NULL
@@ -180,7 +181,7 @@ server <- function (input , output, session ){
   
   PLS <- reactiveValues(res=NULL,resf=NULL,ncompo=NULL,res_df=NULL,resf_df=NULL,ncompo_df=NULL,typ=NULL,dataset=NULL,nY=NULL,validation=NULL,nseg=NULL,segtype=NULL,scale=NULL,model=NULL,
                         ncomp=NULL,rmsep=NULL,rcv=NULL,ncomp_df=NULL,rmsep_df=NULL,rcv_df=NULL,
-                        R_sq=NULL,D=NULL)
+                        R_sq=NULL,D=NULL,D_perm=NULL)
 
   
   
@@ -672,6 +673,10 @@ server <- function (input , output, session ){
         # PLS$scale<-as.logical(input$pls_scale)
         PLS$model<-as.formula(model)
         
+        # PLS$rmsep<-RMSEP(res,estimate='CV',ncomp=PLS$ncomp,intercept=FALSE)$val[1,,]
+        # PLS$rcv<-R2(res,estimate='CV',ncomp=PLS$ncomp,intercept=FALSE)$val[1,,]*100
+        
+        
         # if(input$pls_cv_choise=="1"){
         #   res<-plsr(as.formula(model),ncomp=ncompo,data=M_,segment.type="interleaved",
         #             validation='CV',segments=as.numeric(input$n_cv),scale=as.logical(input$pls_scale))
@@ -851,6 +856,65 @@ output$pls_cv_plot<-renderPlot({
   }
 })
 
+
+# PLS - permutation -------------------------------------------------------
+
+observeEvent(input$bpls_perm,{
+  validate(need(nrow(dati$DS)!=0,""))
+  req(PLS$res)
+
+  Y_<-PLS$dataset[,1,drop=FALSE]
+  X_<-PLS$dataset[,-1,drop=FALSE]
+  D<-data.frame(NULL)
+#   
+  withProgress(message = 'computation progress bar:',value = 0, {
+    n <- as.numeric(input$pls_n_prm) #da definire
+    for(k in 1:n){
+      incProgress(detail = sprintf("%d%% done", round(k/n*100)),amount = 1/n)
+      a=as.numeric(Sys.time())
+      set.seed(a)
+# 
+# 
+
+      Y_=Y_[sample(nrow(Y_)),,drop=FALSE]
+      X_=X_[sample(nrow(X_)),,drop=FALSE]
+      Data<-cbind.data.frame(Y_,X_)
+      res<-plsr(formula = PLS$model, ncomp = as.numeric(input$pls_n_comp_df), data = Data,
+                scale = PLS$scale, validation = "CV", segment.type = "interleaved",segments = as.numeric(input$pls_n_cv))
+      rmsep<-RMSEP(res,intercep=FALSE)
+      D<-rbind.data.frame(D,rmsep$val[1,,as.numeric(input$pls_n_comp_df)])
+    }
+  })
+  colnames(D)<-'RMSECV'
+  PLS$D_perm <- D
+
+})
+
+output$pls_perm_plot <- renderPlot({
+  req(PLS$D_perm)
+  rmsep<-RMSEP(PLS$res,intercep=FALSE)
+  RMSEP <- rmsep$val[1,,as.numeric(input$pls_n_comp_df)]
+  
+  
+  plot(main='Distribution density',xlab='RMSECV',density(PLS$D_perm[,1]),xlim=c(min(RMSEP,PLS$D_perm[,1]),max(RMSEP,PLS$D_perm[,1])))
+  abline(v=RMSEP, col="blue")
+  # if(median(PLS$D_perm[,1])>=RMSEP){
+  #   print(paste0(sum(PLS$D_perm[,1]<=RMSEP)/as.numeric(input$pls_n_prm),'%'))
+  # }else{
+  #   print(paste0(sum(PLS$D_perm[,1]>=RMSEP)/as.numeric(input$pls_n_prm),'%'))
+  # }
+})
+
+output$pls_perm_txt <- renderPrint({
+  req(PLS$D_perm)
+  rmsep<-RMSEP(PLS$res,intercep=FALSE)
+  RMSEP <- rmsep$val[1,,as.numeric(input$pls_n_comp_df)]
+  if(median(PLS$D_perm[,1])>=RMSEP){
+    cat(paste0(sum(PLS$D_perm[,1]<=RMSEP)/as.numeric(input$pls_n_prm),'%'))
+  }else{
+    cat(paste0(sum(PLS$D_perm[,1]>=RMSEP)/as.numeric(input$pls_n_prm),'%'))
+  }
+})
 
 # # PLS - CV ripetuto -------------------------------------------------------
 # 
