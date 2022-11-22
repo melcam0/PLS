@@ -21,22 +21,6 @@ sidebar<- dashboardSidebar(
                 menuItem(text = "PLS",icon = shiny::icon("expand-arrows-alt"),
                          menuItem("Model computation",tabName = "pls_CV"),
                          menuItem("Permutation test",tabName = "pls_permutation")),
-                         
-                #          
-                #          
-                # # menuItem(text = "Model computation",icon = shiny::icon("expand-arrows-alt"),
-                #          menuItem("PCR",tabName = "pcr",
-                #                   menuItem("single CV",tabName = "pcr_CV"),
-                #                   # menuItem("repeated CV",tabName = "pcr_r_CV"),
-                #                   menuItem("permutation test",tabName = "pcr_permtation"))),
-                #          menuItem("PLS",tabName = "pls",
-                #                   menuItem("single CV",tabName = "pls_CV"),
-                #                   # menuItem("repeated CV",tabName = "pls_r_CV"),
-                #                   menuItem("permutation test",tabName = "pls_permtation"))),
-                
-                
-                
-                
                 hr(),
                 menuItem("Experimentals vs Calculated",tabName = "exp_calc"),
                 menuItem("Residuals",tabName = "res"),
@@ -96,7 +80,6 @@ body<-dashboardBody(
                                                          choices = c(Head = "head",
                                                                      All = "all"),
                                                          selected = "head")),
-                                     
                                      column(8,
                                             div(style = 'overflow-x: scroll;',tableOutput("contents_xlsx")))),
                             tabPanel("CSV", 
@@ -122,7 +105,6 @@ body<-dashboardBody(
                                                          choices = c(Head = "head",
                                                                      All = "all"),
                                                          selected = "head")),
-                                     
                                      column(8,
                                             div(style = 'overflow-x: scroll;',tableOutput("contents_csv")))),
                             tabPanel("Paste",
@@ -175,8 +157,7 @@ body<-dashboardBody(
 
       tabItem(tabName = "profile",
               fluidPage(titlePanel("Row profile"),
-                        column(8
-                               ,
+                        column(8,
                                plotOutput('profile_plot')
                                ),
                         column(4,
@@ -227,12 +208,8 @@ body<-dashboardBody(
                                uiOutput('pls_n_rnd'),
                                br(),
                                uiOutput('pls_n_comp_df'),
-                               # br(),
-                               # uiOutput('bplsmodel_df'),
-                               # br(),
                                verbatimTextOutput('plsmodel_out_df'))
                         )
-              
               ),
 
 # PLS - permutation -------------------------------------------------------
@@ -240,17 +217,8 @@ body<-dashboardBody(
 tabItem(tabName = "pls_permutation",
         fluidPage(titlePanel("Permutation test"),
                   column(12,
-                         
                          numericInput("pls_n_prm", label = "Number of permutations", value = 1000),
-                         actionButton("bpls_perm", label = "Execute")
-                         
-                         
-                         # selectInput("pls_n_prm", label = "Number of permutations", 
-                         #             choices = 1:10000,
-                         #             selected = 50)
-                         
-                         
-                  ),
+                         actionButton("bpls_perm", label = "Execute")),
                  column(12,
                         br()),
                   column(8,
@@ -261,9 +229,6 @@ tabItem(tabName = "pls_permutation",
                   
         )
 ),
-
-
-
 
 # PLS - Exp vs calc -------------------------------------------------------------
 
