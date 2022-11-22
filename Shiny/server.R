@@ -578,7 +578,7 @@ server <- function (input , output, session ){
   })
   
   output$profile_success_trasf <- renderPrint({
-    trsf$testo
+    cat(trsf$testo)
   })
   
   observeEvent(input$profile_reset,{
@@ -615,9 +615,7 @@ server <- function (input , output, session ){
   output$pls_n_rnd<-renderUI({
     req(!is.null(dati$DS))
     req(input$pls_cv_choise=="2")
-    selectInput("pls_n_rnd", label = "Number of randomizations", 
-                choices = c(1:1000), 
-                selected = 100)
+    numericInput("pls_n_rnd", label = "Number of randomizations",value = 100,min = 1,max = 10000)
   })
   
   observeEvent(input$bplsmodel,{
@@ -1119,6 +1117,96 @@ server <- function (input , output, session ){
       df <- PLS$res$scores[,]
       write.xlsx(df, file,colNames=TRUE)
     })
+
+# PLS - loading plots -----------------------------------------------------
+
+  output$pls_load_compx <- renderUI({
+    req(!is.null(PLS$res))
+    req(input$pls_radio_load_type=='sca')
+    selectInput("pls_load_compx", label = "Component on x-axis", 
+                choices = 1:as.numeric(input$pls_n_comp_df), 
+                selected = 1)
+  })
+  
+  output$pls_load_compy <- renderUI({
+    req(!is.null(PLS$res))
+    req(input$pls_radio_load_type=='sca')
+    selectInput("pls_load_compy", label = "Component on y-axis", 
+                choices = 1:as.numeric(input$pls_n_comp_df), 
+                selected = 2)
+  })
+  
+  output$pls_load_rnames <- renderUI({
+    req(!is.null(PLS$res))
+    req(input$pls_radio_load_type=='sca')
+    checkboxInput("pls_load_rnames", label = "Variable names", value = FALSE)
+  })
+  
+  output$pls_load_arrows <- renderUI({
+    req(!is.null(PLS$res))
+    req(input$pls_radio_load_type=='sca')
+    checkboxInput("pls_load_arrows", label = "Arrows", value = FALSE)
+  })
+  
+  output$pls_load_linecomp <- renderUI({
+    req(!is.null(PLS$res))
+    req(input$pls_radio_load_type=='line')
+    textInput("pls_load_linecomp", label = "Components to be plotted (e.g.,1,3,5)", value = "1,2")
+  })
+  
+  output$pls_load_compN <- renderUI({
+    req(!is.null(PLS$res))
+    req(input$pls_radio_load_type=='bar')
+    selectInput("pls_load_compN", label = "Component number", 
+                choices = 1:PLS$res@nPcs, 
+                selected = 1)
+  })
+  
+  output$pls_load_cnames <- renderUI({
+    req(!is.null(PLS$res))
+    req(input$pls_radio_load_type=='bar')
+    checkboxInput("pls_load_cnames", label = "Column names", value = FALSE)
+  })
+  
+  output$loading_pl <- renderPlot({
+    req(!is.null(PLS$res))
+    # req(!is.null(input$pls_load_rnames))
+    require(stringr)
+    require(gplots)
+    if(input$pls_radio_load_type=="sca"){
+      req(!is.null(input$pls_load_rnames))
+      n1<-as.integer(input$pls_load_compx)
+      n2<-as.integer(input$pls_load_compy)
+      T<-loadings(PLS$res)
+      tex<-as.character(1:nrow(T))
+      if(as.logical(input$pls_load_rnames))tex<-row.names(T)
+      Tlim<-c(min(T[,c(n1,n2)]),max(T[,c(n1,n2)]))
+      Tlim<-c(sign(Tlim[1])*max(abs(Tlim)),sign(Tlim[2])*max(abs(Tlim)))
+      plot(T[,n1],T[,n2],xlab=paste('Component ',n1),ylab=paste('Component ',n2),
+           main='X-loading Plot',type='n',xlim=Tlim,ylim=Tlim)
+      text(T[,n1],T[,n2],tex,cex=0.6)
+      text(0,0,'+',cex=1.2,col='red')
+      grid()
+      if(as.logical(input$pls_load_arrows))
+        arrows(rep(0,dim(T)[1]),rep(0,dim(T)[2]),T[,n1],T[,n2],col='red')
+    }
+    if(input$pls_radio_load_type=="line"){
+      req(!is.null(input$pls_load_linecomp))
+      T<-loadings(PLS$res)
+      plot(T[,1],ylab='x-loading value',xlab='Variable number',type='n',ylim=c(min(T),max(T)))
+      vi<-as.numeric(unlist(str_split(input$pls_load_linecomp,',')))
+      grid()
+      for(i in vi)lines(T[,i],col=i)
+      legend("bottomleft",legend=as.character(vi),col=vi,lty=1)
+    }
+  })
+  
+  output$pls_loading_dwl <- downloadHandler(
+    filename = "loadings.xlsx",
+    content = function(file) {
+      df <- loadings(PLS$res)[,]
+      write.xlsx(df, file,colNames=TRUE)
+    })
   
 
 
@@ -1144,146 +1232,6 @@ server <- function (input , output, session ){
 
 
 
-# PCA - loading plots -----------------------------------------------------
-
-output$pca_load_compx <- renderUI({
-  req(!is.null(PCA$res))
-  req(input$pca_radio_load_type=='sca')
-  selectInput("pca_load_compx", label = "Component on x-axis", 
-              choices = 1:PCA$res@nPcs, 
-              selected = 1)
-})
-
-output$pca_load_compy <- renderUI({
-  req(!is.null(PCA$res))
-  req(input$pca_radio_load_type=='sca')
-  selectInput("pca_load_compy", label = "Component on y-axis", 
-              choices = 1:PCA$res@nPcs, 
-              selected = 2)
-})
-
-output$pca_load_rnames <- renderUI({
-  req(!is.null(PCA$res))
-  req(input$pca_radio_load_type=='sca')
-  checkboxInput("pca_load_rnames", label = "Row names", value = FALSE)
-})
-
-output$pca_load_arrows <- renderUI({
-  req(!is.null(PCA$res))
-  req(input$pca_radio_load_type=='sca')
-  checkboxInput("pca_load_arrows", label = "Arrows", value = FALSE)
-})
-
-output$pca_load_linecomp <- renderUI({
-  req(!is.null(PCA$res))
-  req(input$pca_radio_load_type=='line')
-  textInput("pca_load_linecomp", label = "Components to be plotted (e.g.,1,3,5)", value = "1,2")
-})
-
-output$pca_load_compN <- renderUI({
-  req(!is.null(PCA$res))
-  req(input$pca_radio_load_type=='bar')
-  selectInput("pca_load_compN", label = "Component number", 
-              choices = 1:PCA$res@nPcs, 
-              selected = 1)
-})
-
-output$pca_load_cnames <- renderUI({
-  req(!is.null(PCA$res))
-  req(input$pca_radio_load_type=='bar')
-  checkboxInput("pca_load_cnames", label = "Column names", value = FALSE)
-})
-
-output$loading_pl <- renderPlot({
-  req(!is.null(PCA$res))
-  require(stringr)
-  require(gplots)
-  if(input$pca_radio_load_type=='sca'){
-    req(!is.null(input$pca_load_rnames))
-    
-    ans1 <- list()
-    ans1[[1]] <- as.numeric(input$pca_load_compx)
-    ans1[[2]] <- as.numeric(input$pca_load_compy)
-    ans1[[3]] <- 'None'
-    ans1[[4]] <- input$pca_load_rnames
-    ans1[[5]] <- input$pca_load_arrows
-    
-    op<-par(pty='s')
-    n1<-as.integer(ans1[[1]])
-    n2<-as.integer(ans1[[2]])
-    T<-PCA$res@loadings
-    V<-PCA$res@R2
-    siz=.9-log10(nrow(T))/10 # defines the size of the characters in the plots, based on the number of variables
-    tex<-as.character(1:nrow(T))
-    # if(ans[[3]]!='None'){
-    #   variable<-makevar(ans[[3]])
-    #   tex<-variable$value
-    # }
-    if(as.logical(ans1[[4]]))tex<-row.names(T)
-    Tlim<-c(min(T[,c(n1,n2)]),max(T[,c(n1,n2)]))
-    Tlim<-c(sign(Tlim[1])*max(abs(Tlim)),sign(Tlim[2])*max(abs(Tlim)))
-    
-    if(PCA$type=='pca'){
-      plot(T[,n1],T[,n2],xlab=paste('Component ',as.character(n1),' (',as.character(round(V[n1]*100,1)),'% of variance)',sep=''),ylab=paste('Component ',as.character(n2),' (',as.character(round(V[n2]*100,1)),'% of variance)',sep=''),
-           main=paste('Loading Plot (',as.character(round((V[n1]+V[n2])*100,1)),'% of total variance)',sep=''),type='n',xlim=Tlim,ylim=Tlim)
-    }else{
-      plot(T[,n1],T[,n2],xlab=paste('Factor ',as.character(n1),' (',as.character(round(V[n1]*100,1)),'% of variance)',sep=''),ylab=paste('Factor ',as.character(n2),' (',as.character(round(V[n2]*100,1)),'% of variance)',sep=''),
-           main=paste('Loading Plot (',as.character(round((V[n1]+V[n2])*100,1)),'% of total variance)',sep=''),type='n',xlim=Tlim,ylim=Tlim)}
-    
-    text(T[,n1],T[,n2],tex,cex=siz) 
-    text(0,0,'+',cex=1.2,col='red')
-    grid()
-    if(as.logical(ans1[[5]]))
-      arrows(rep(0,dim(T)[1]),rep(0,dim(T)[2]),T[,n1],T[,n2],0.1,col='red')
-  }
-
-  if(input$pca_radio_load_type=='line'){
-    req(input$pca_load_linecomp)
-    req(sum(is.na(as.numeric(unlist(str_split(input$pca_load_linecomp,',')))))==0)
-    T<-PCA$res@loadings
-    vi<-as.numeric(unlist(str_split(input$pca_load_linecomp,',')))
-    plot(T[,1],ylab='Loading value',xlab='Variable number',type='n',ylim=c(min(T[,vi]),max(T[,vi])))
-    grid()
-    for(i in vi)lines(T[,i],col=i)
-    legend("bottomleft",legend=as.character(vi),col=vi,lty=1)
-    # rm(i,vi)
-    abline(0,0,lty=2) 
-  }
-
-  if(input$pca_radio_load_type=='bar'){
-    req(!is.null(input$pca_load_cnames))
-
-    plotco<-function(T,c1=1,label=NULL){
-      nr<-nrow(T)
-      if(is.null(label))label<-as.character(1:nr)
-      # dev.new(title="PCA loading plot bar")
-      
-      if(PCA$type=='pca'){
-        barplot(T[,c1],main=paste('Loading on Component',as.character(c1),sep=' '),
-                names.arg=as.character(label),cex.names=0.7,las=2,mgp=c(3, .4, 0))}
-      else{
-        barplot(T[,c1],main=paste('Loading on Factor',as.character(c1),sep=' '),
-                names.arg=as.character(label),cex.names=0.7,las=2,mgp=c(3, .4, 0))}
-      box(lty=1,col='red')
-      grid()
-      return()}
-
-    ans <- list()
-    ans[[1]] <- as.numeric(input$pca_load_compN)
-    ans[[2]] <- input$pca_load_cnames
-    
-    lb<-1:PCA$res@nVar
-    if(as.logical(ans[[2]]))lb<-names(as.data.frame(PCA$dataset))
-    plotco(PCA$res@loadings,as.numeric(ans[[1]]),lb)
-  }
-})
-
-output$pca_loading_dwl <- downloadHandler(
-  filename = "loadings.xlsx", 
-  content = function(file) {
-    df <- PCA$res@loadings
-    write.xlsx(df, file,colNames=TRUE)
-  })
 
 
 # PCA - biplot ------------------------------------------------------------

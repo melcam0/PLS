@@ -283,6 +283,33 @@ tabItem(tabName = "scores",
 
         )),
 
+# PLS - loading plot ------------------------------------------------------
+
+tabItem(tabName = "load",
+        fluidPage(titlePanel("Loading Plots"),
+                  column(8,radioButtons("pls_radio_load_type", "Plots",choices = c(Scatter = "sca", Line= "line"), 
+                                        selected = "sca", inline=TRUE)),
+                  column(2),
+                  column(12),
+                  column(8,
+                         plotOutput('loading_pl',height = "600px"),
+                         br(),
+                         downloadButton("pls_loading_dwl")),
+                  column(4,
+                         uiOutput('pls_load_compx'),
+                         uiOutput('pls_load_compy'),
+                         uiOutput('pls_load_rnames'),
+                         uiOutput('pls_load_arrows'),
+                         uiOutput('pls_load_linecomp'),
+                         uiOutput('pls_load_compN'),
+                         uiOutput('pls_load_cnames'))
+                  
+        )),
+
+
+
+
+
 
 
 
@@ -316,96 +343,52 @@ tabItem(tabName = "scores",
 
 
 # 
+# # PCA - missing data reconstruction ---------------------------------------
 # 
-# # PLS - Cv ripetuto -------------------------------------------------------
-# 
-# tabItem(tabName = "pls_r_CV",
-#         fluidPage(titlePanel("Model computation: PLS repeated CV"),
-#                   
+# tabItem(tabName = "dati_mancanti",
+#         fluidPage(titlePanel("Missing data reconstruction"),
 #                   column(4,
-#                          checkboxInput("pls_r_CV_scale", label = "Scale (centering by default)", value = TRUE)),
+#                          br(),br(),
+#                          checkboxInput("pca_missdata_center", label = "Center", value = TRUE)),
 #                   column(4,
-#                          uiOutput('pls_r_CV_n_comp')),
+#                          br(),br(),
+#                          checkboxInput("pca_missdata_scale", label = "Scale", value = TRUE)),
 #                   column(4,
-#                          uiOutput('pls_r_CV_n_cv')),
+#                          # uiOutput('pca_missdata_varsup'),
+#                          uiOutput('pca_missdata_n_comp_max')),
 #                   column(12,
-#                          actionButton("pls_r_CV_bplsmodel", label = "Execute")),
+#                          actionButton("bpcamodel_miss", label = "Execute")),
 #                   column(12,
-#                          hr()),
+#                          br()),
 #                   column(8,
-#                          plotOutput('pls_r_CV_cv_plot',height = "600px"),
-#                          br(),
-#                          verbatimTextOutput('pls_r_CV_model_out')
-#                          ),
+#                          plotOutput('pca_miss_pl')),
 #                   column(4,
-#                          uiOutput('pls_r_CV_n_rnd'),
+#                          uiOutput('pca_missdata_n_comp'),
+#                          uiOutput('bpcamodel_miss_rec')),
+#                   column(12,
 #                          br(),
-#                          uiOutput('pls_r_CV_n_comp_df'),
+#                          verbatimTextOutput('pca_missdata_cmpl'),
+#                          downloadButton("pca_missdata_dwl"))
+#                   
+#                   
+#         )),
+
+# # PCA - randomization test ---------------------------------------
+# 
+# tabItem(tabName = "rnd_test",
+#         fluidPage(titlePanel("Randomization Test"),
+#                   column(9,
 #                          br(),
-#                          uiOutput('pls_r_CV_bplsmodel_df'),
-#                          br(),
-#                          verbatimTextOutput('pls_r_CV_model_out_df')
-#                          )
-#         )
-#         
-# ),
-
-
-
-
-
-
-
-
-
-
-
-# PCA - missing data reconstruction ---------------------------------------
-
-tabItem(tabName = "dati_mancanti",
-        fluidPage(titlePanel("Missing data reconstruction"),
-                  column(4,
-                         br(),br(),
-                         checkboxInput("pca_missdata_center", label = "Center", value = TRUE)),
-                  column(4,
-                         br(),br(),
-                         checkboxInput("pca_missdata_scale", label = "Scale", value = TRUE)),
-                  column(4,
-                         # uiOutput('pca_missdata_varsup'),
-                         uiOutput('pca_missdata_n_comp_max')),
-                  column(12,
-                         actionButton("bpcamodel_miss", label = "Execute")),
-                  column(12,
-                         br()),
-                  column(8,
-                         plotOutput('pca_miss_pl')),
-                  column(4,
-                         uiOutput('pca_missdata_n_comp'),
-                         uiOutput('bpcamodel_miss_rec')),
-                  column(12,
-                         br(),
-                         verbatimTextOutput('pca_missdata_cmpl'),
-                         downloadButton("pca_missdata_dwl"))
-                  
-                  
-        )),
-
-# PCA - randomization test ---------------------------------------
-
-tabItem(tabName = "rnd_test",
-        fluidPage(titlePanel("Randomization Test"),
-                  column(9,
-                         br(),
-                         actionButton("brnd_test", label = "Execute")),
-                  column(2,
-                         selectInput("rnd_test_N", label = "Number of randomization", 
-                                     choices = c(1:10000), 
-                                     selected = 100)),
-                  column(12,
-                         br()),
-                  column(8,
-                         plotOutput('rnd_test_pl',height = "600px"))
-        )),
+#                          actionButton("brnd_test", label = "Execute")),
+#                   column(2,
+#                          selectInput("rnd_test_N", label = "Number of randomization", 
+#                                      choices = c(1:10000), 
+#                                      selected = 100)),
+#                   column(12,
+#                          br()),
+#                   column(8,
+#                          plotOutput('rnd_test_pl',height = "600px"))
+#         )),
 # PCA - plots -------------------------------------------------------------
 # PCA - scores plot -------------------------------------------------------
 # tabItem(tabName = "scores",
@@ -438,28 +421,7 @@ tabItem(tabName = "rnd_test",
 # 
 #                   
 #         )),
-# PCA - loading plot ------------------------------------------------------
 
-tabItem(tabName = "loadings",
-        fluidPage(titlePanel("Loading Plots"),
-                  column(8,radioButtons("pca_radio_load_type", "Plots",choices = c(Scatter = "sca", Line= "line", Bar= "bar"), 
-                                        selected = "sca", inline=TRUE)),
-                  column(2),
-                  column(12),
-                  column(8,
-                         plotOutput('loading_pl',height = "600px"),
-                         br(),
-                         downloadButton("pca_loading_dwl")),
-                  column(4,
-                         uiOutput('pca_load_compx'),
-                         uiOutput('pca_load_compy'),
-                         uiOutput('pca_load_rnames'),
-                         uiOutput('pca_load_arrows'),
-                         uiOutput('pca_load_linecomp'),
-                         uiOutput('pca_load_compN'),
-                         uiOutput('pca_load_cnames'))
-                  
-        )),
 
 # PCA - biplot ------------------------------------------------------
 
