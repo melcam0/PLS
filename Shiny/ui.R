@@ -184,7 +184,6 @@ body<-dashboardBody(
 
       tabItem(tabName = "pls_CV",
               fluidPage(titlePanel("Model computation"),
-                        
                         column(12,
                                radioButtons("pls_cv_choise", label ="",inline=TRUE,
                                             choices = list("single CV" = 1, "repeated CV" = 2), 
@@ -303,336 +302,126 @@ tabItem(tabName = "load",
                          uiOutput('pls_load_linecomp'),
                          uiOutput('pls_load_compN'),
                          uiOutput('pls_load_cnames'))
-                  
         )),
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# 
-# # PCA - missing data reconstruction ---------------------------------------
-# 
-# tabItem(tabName = "dati_mancanti",
-#         fluidPage(titlePanel("Missing data reconstruction"),
-#                   column(4,
-#                          br(),br(),
-#                          checkboxInput("pca_missdata_center", label = "Center", value = TRUE)),
-#                   column(4,
-#                          br(),br(),
-#                          checkboxInput("pca_missdata_scale", label = "Scale", value = TRUE)),
-#                   column(4,
-#                          # uiOutput('pca_missdata_varsup'),
-#                          uiOutput('pca_missdata_n_comp_max')),
-#                   column(12,
-#                          actionButton("bpcamodel_miss", label = "Execute")),
-#                   column(12,
-#                          br()),
-#                   column(8,
-#                          plotOutput('pca_miss_pl')),
-#                   column(4,
-#                          uiOutput('pca_missdata_n_comp'),
-#                          uiOutput('bpcamodel_miss_rec')),
-#                   column(12,
-#                          br(),
-#                          verbatimTextOutput('pca_missdata_cmpl'),
-#                          downloadButton("pca_missdata_dwl"))
-#                   
-#                   
-#         )),
-
-# # PCA - randomization test ---------------------------------------
-# 
-# tabItem(tabName = "rnd_test",
-#         fluidPage(titlePanel("Randomization Test"),
-#                   column(9,
-#                          br(),
-#                          actionButton("brnd_test", label = "Execute")),
-#                   column(2,
-#                          selectInput("rnd_test_N", label = "Number of randomization", 
-#                                      choices = c(1:10000), 
-#                                      selected = 100)),
-#                   column(12,
-#                          br()),
-#                   column(8,
-#                          plotOutput('rnd_test_pl',height = "600px"))
-#         )),
-# PCA - plots -------------------------------------------------------------
-# PCA - scores plot -------------------------------------------------------
-# tabItem(tabName = "scores",
-#         fluidPage(titlePanel("Score Plots"),
-#                   column(8,radioButtons("pca_radio_score_type", "Plots",
-#                                         choices = c(Bidimensional = "2d", Tridimensional = "3d"), 
-#                                         selected = "2d", inline=TRUE)),
-#                   column(2),
-#                   column(12),
-#                   column(8,
-#                          plotOutput('scores_pl',height = "600px"),
-#                          br()),
-#                   column(4,
-#                          uiOutput('pca_score_compx'),
-#                          uiOutput('pca_score_compy'),
-#                          uiOutput('pca_score_compz'),
-#                          uiOutput('pca_score_label'),
-#                          uiOutput('pca_score_col'),
-#                          uiOutput('pca_score_chull'),
-#                          uiOutput('pca_score_col_fatt'),
-#                          uiOutput('pca_score_chull_fatt'),
-#                          uiOutput('pca_score_rnames'),
-#                          uiOutput('pca_score_ell'),
-#                          uiOutput('pca_score_line'),
-#                          uiOutput('scores_pl3d_lv_z'),
-#                          uiOutput('scores_pl3d_lv_x')),
-#                   column(12,
-#                          # verbatimTextOutput('pca_score_out'),
-#                          downloadButton("pca_score_dwl")),
-# 
-#                   
-#         )),
-
-
-# PCA - biplot ------------------------------------------------------
+# PLS - biplot ------------------------------------------------------
 
 tabItem(tabName = "biplot",
         fluidPage(titlePanel("Biplot"),
-                  column(12),
                   column(8,
+                         hr(),
                          plotOutput('biplot',height = "600px")),
                   column(4,
-                         uiOutput('pca_biplot_compx'),
-                         uiOutput('pca_biplot_compy'),
-                         uiOutput('pca_biplot_rnames'),
-                         uiOutput('pca_biplot_cnames'),
-                         uiOutput('pca_biplot_arrows'))
+                         uiOutput('pls_biplot_compx'),
+                         uiOutput('pls_biplot_compy'),
+                         uiOutput('pls_biplot_arrows'))
         )),
 
-# PCA - correlation plot ------------------------------------------------------
+# PLS - coefficients ------------------------------------------------------
 
-tabItem(tabName = "correlation",
-        fluidPage(titlePanel("Correlation plot"),
-                  column(12),
+tabItem(tabName = "coeff",
+        fluidPage(titlePanel("Coefficients"),
                   column(8,
-                         plotOutput('corr_pl',height = "600px"),
+                         hr(),
+                         plotOutput('coeff_pl',height = "600px"),
                          br(),
-                         downloadButton("pca_corr_dwl")),
+                         downloadButton("pls_coeff_dwl")),
                   column(4,
-                         uiOutput('pca_corr_compx'),
-                         uiOutput('pca_corr_compy'),
-                         uiOutput('pca_corr_varsup'),
-                         uiOutput('pca_corr_rnames'),
-                         uiOutput('pca_corr_arrows'))
-        )),
+                         uiOutput('pls_coeff_comp'))
 
-# PCA - explained variance variable ------------------------------------------------------
-
-tabItem(tabName = "var_variable",
-        fluidPage(titlePanel("Variance of each variable"),
-                  column(12),
-                  column(8,
-                         # verbatimTextOutput('var_var_pl'),
-                         plotOutput('var_var_pl',height = "600px"),
-                         br(),
-                         downloadButton("pca_var_var_dwl")),
-                  column(4,
-                         uiOutput('pca_var_var_compN'))
         )),
 
 
-# PCA - diagnostic --------------------------------------------------------
-# PCA - T^2 and/vs Q ---------------------------------------------------------
+# PLS - prediction --------------------------------------------------------
 
-tabItem(tabName = "t2andq",
-        fluidPage(titlePanel(uiOutput("pca_dia_t2andq_title")),
-                  column(8,
-                         radioButtons("pca_dia_t2andq_type", "Plots",
-                                      choices = c("T^2 and Q" = "t2andq", "T^2 vs Q" = "t2vsq"),
-                                      selected = "t2andq", inline=TRUE)),
-                  column(4,
-                         uiOutput('pca_dia_t2andq_joint')),
-                  column(12
-                         # ,actionButton("bpca_dia_t2andq", label = "Execute")
-                         ),
-                  column(8,
-                         # verbatimTextOutput('var_var_pl'),
-                         plotOutput('pca_dia_t2andq_pl',height = "600px"),
-                         br(),
-                         downloadButton("pca_dia_t2andq_dwl")),
-                  column(4,
-                         uiOutput('pca_dia_t2andq_compN'),
-                         uiOutput("pca_dia_t2andq_rn"))
-        )),
-
-
-
-
-
-
-# PCA - T^2 contribution ---------------------------------------------------------
-
-tabItem(tabName = "t2contr",
-        fluidPage(titlePanel(HTML('T <sup>2</sup> Contribution Plot')),
-
-                  column(12),
-                  column(8,
-                         plotOutput('pca_dia_t2contr_pl',height = "600px"),
-                         br(),
-                         downloadButton("pca_dia_t2contr_dwl")
-                         ),
-                  column(4,
-                         uiOutput('pca_dia_t2contr_nr'),
-                         uiOutput("pca_dia_t2contr_compN"),
-                         checkboxInput("pca_dia_t2contr_norm", label = "Normalized", value = TRUE)
-                         )
-        )),
-
-# PCA - Q contribution ---------------------------------------------------------
-
-tabItem(tabName = "qcontr",
-        fluidPage(titlePanel('Q Contribution Plot'),
+tabItem(tabName = "pred",
+        fluidPage(titlePanel("Prediction"),
+                  hr(),
+                  # h4('Load data set with samples to be predicted'),
                   
-                  column(12),
-                  column(8,
-                         plotOutput('pca_dia_qcontr_pl',height = "600px"),
-                         br(),
-                         downloadButton("pca_dia_qcontr_dwl")
-                  ),
+                  # 
+                  # column(12,
+                  #        verbatimTextOutput('pls_load_ds')),
+                  # 
+                  # column(12,
+                  #        hr('Load data set with samples to be predicted')),
+                  
+                  
                   column(4,
-                         uiOutput('pca_dia_qcontr_nr'),
-                         uiOutput("pca_dia_qcontr_compN"),
-                         checkboxInput("pca_dia_qcontr_norm", label = "Normalized", value = TRUE)
-                  )
-        )),
-
-
-
-# PCA - ext data ----------------------------------------------------------
-
-
-# PCA - ext data projection -----------------------------------------------
-
-tabItem(tabName = "ext_prj",
-        fluidPage(titlePanel("Projection on the training set"),
-                  column(6,
-                         radioButtons("pca_ext_data_load", "Load the training set",
+                         uiOutput('lista_esempi_ext')),
+                  column(2,
+                         radioButtons("pls_pred_data_load", "or",
                                       choices = c(Paste = "paste",
                                                   Excel = "excel"),
                                       selected = "paste",inline=TRUE)),
-                  column(6,
-                         uiOutput('pca_ext_data_paste_sp'),
-                         uiOutput('pca_ext_data_paste'),
-                         uiOutput('pca_ext_data_paste_sp1'),
-                         uiOutput('pca_ext_data_excel')),
+                  column(1),
+                  column(2,
+                         uiOutput('pls_pred_data_paste_sp'),
+                         uiOutput('pls_pred_data_paste'),
+                         uiOutput('pls_pred_data_paste_sp1'),
+                         uiOutput('pls_pred_data_excel')),
+                  
+                  column(12),
+                  
+                  
+                  
+                  column(3,
+                         verbatimTextOutput('pls_load_ds')),
+                  column(1),
+                  column(2,
+                         checkboxInput("pls_pred_y_chk", "Data set with responce variable", FALSE)),
+                  column(1),
+                  column(5,
+                         # ,
+                         uiOutput('pls_pred_data_var_y')
+                         
+                         # ,
+                         # uiOutput('pls_pred_data_varsup'),
+                         # uiOutput('pls_pred_data_rwnames'),
+                         # uiOutput('pls_pred_data_compx'),
+                         # uiOutput('pls_pred_data_compy'),
+                         # uiOutput('pls_pred_data_rnames'),
+                         # uiOutput('pls_pred_data_rnames_tr'),
+                         # uiOutput('pls_pred_data_ell')
+                  ),
+                  # 
+                  # column(4,
+                  #        uiOutput('pls_pred_data_var_y')),
+                  
                   column(12,
-                         actionButton("bpcaext", label = "Execute")),
+                         br(),
+                         br()),
+                  
+                  column(12,
+                         actionButton("bplsext", label = "Execute")),
                   column(12,
                          br()),
-                  column(8,
-                         plotOutput('pca_ext_data_pl',height = "600px"),
-                         br(),
-                         downloadButton("pca_ext_data_dwl")),
-                  column(4,
-                         uiOutput('pca_ext_data_varnames'),
-                         uiOutput('pca_ext_data_varsup'),
-                         uiOutput('pca_ext_data_rwnames'),
-                         uiOutput('pca_ext_data_compx'),
-                         uiOutput('pca_ext_data_compy'),
-                         uiOutput('pca_ext_data_rnames'),
-                         uiOutput('pca_ext_data_rnames_tr'),
-                         uiOutput('pca_ext_data_ell'))
-        )),
-
-# PCA ext - diagnostic --------------------------------------------------------
-# PCA ext - T^2 vs Q ---------------------------------------------------------
-
-tabItem(tabName = "ext_t2andq",
-        fluidPage(titlePanel(HTML("T <sup>2</sup> vs Q (influence plot)")),
-                  column(8),
-                  column(4,
-                         checkboxInput("pca_dia_ext_t2andq_joint", label = "Joint diagnostics", value = FALSE)),
-                  column(12),
-                  column(8,
-                         plotOutput('pca_dia_ext_t2andq_pl',height = "600px"),
-                         br(),
-                         downloadButton("pca_dia_ext_t2andq_dwl")),
-                  column(4,
-                         uiOutput('pca_ext2q_compN'),
-                         uiOutput('pca_ext_data_t2q_lab'),
-                         checkboxInput("pca_dia_ext_t2andq_rnumbers", label = "Row Numbers", value = FALSE))
-        )),
-
-
-# PCA ext- T^2 contribution ---------------------------------------------------------
-
-tabItem(tabName = "ext_t2contr",
-        fluidPage(titlePanel(HTML('T <sup>2</sup> Contribution Plot')),
                   
-                  column(12),
-                  column(8,
-                         plotOutput('pca_dia_ext_t2contr_pl',height = "600px"),
-                         br(),
-                         downloadButton("pca_dia_ext_t2contr_dwl")
-                  ),
-                  column(4,
-                         uiOutput('pca_dia_ext_t2contr_nr'),
-                         uiOutput("pca_dia_ext_t2contr_compN"),
-                         checkboxInput("pca_dia_ext_t2contr_norm", label = "Normalized", value = TRUE)
-                  )
-        )),
-
-# PCA ext- Q contribution ---------------------------------------------------------
-
-tabItem(tabName = "ext_qcontr",
-        fluidPage(titlePanel(HTML('Q Contribution Plot')),
                   
-                  column(12),
                   column(8,
-                         plotOutput('pca_dia_ext_qcontr_pl',height = "600px"),
+                         verbatimTextOutput('pls_pred_print')),
+                  
+                  column(8,
+                         plotOutput('pls_pred_data_pl',height = "600px"),
                          br(),
-                         downloadButton("pca_dia_ext_qcontr_dwl")
-                  ),
+                         downloadButton("pls_pred_data_dwl"),
+                         # hr(),
+                         ),
                   column(4,
-                         uiOutput('pca_dia_ext_qcontr_nr'),
-                         uiOutput("pca_dia_ext_qcontr_compN"),
-                         checkboxInput("pca_dia_ext_qcontr_norm", label = "Normalized", value = TRUE)
-                  )
+                         # checkboxInput("pls_pred_y_chk", "Data set with responce variable", FALSE),
+                         # uiOutput('pls_pred_data_var_y')
+                         # ,
+                         # uiOutput('pls_pred_data_varsup'),
+                         uiOutput('pls_ext_data_rnames')
+                         # uiOutput('pls_pred_data_compx'),
+                         # uiOutput('pls_pred_data_compy'),
+                         # uiOutput('pls_pred_data_rnames'),
+                         # uiOutput('pls_pred_data_rnames_tr'),
+                         # uiOutput('pls_pred_data_ell')
+                         ),
+                  
         ))
 
-
-
-
-      
    
      
 )))

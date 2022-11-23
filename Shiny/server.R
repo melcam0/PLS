@@ -187,8 +187,8 @@ server <- function (input , output, session ){
   
   
   
-  PCA_miss<-reactiveValues(res=NULL,DS_rec=NULL)
-  PCA_ext <- reactiveValues(scores=NULL,T2=NULL,Q=NULL)
+  # PCA_miss<-reactiveValues(res=NULL,DS_rec=NULL)
+  PLS_ext <- reactiveValues(prm=NULL,prm.tr=NULL,rmsep=NULL,res=NULL,res.tr=NULL)
 
   graf<-reactiveValues(xlim=NULL,ylim=NULL,var_gr=NULL,gr=NULL)
 
@@ -600,11 +600,12 @@ server <- function (input , output, session ){
 
   output$pls_n_comp<-renderUI({
     req(dati$var_qt)
+    n <- length(dati$var_qt)-length(input$var_y)
     selectInput("pls_n_comp", label = "Max. number of components", 
-                choices = c(2:length(dati$var_qt)), 
+                choices = c(2:n), 
                 selected = 10)
       })
-  
+
   output$pls_n_cv<-renderUI({
     req(!is.null(dati$DS))
     selectInput("pls_n_cv", label = "Number of segments for CV", 
@@ -868,7 +869,8 @@ server <- function (input , output, session ){
   })
   
   output$pls_expvsfitted <- renderPlot({
-    req(!is.null(PLS$res))
+    # req(!is.null(PLS$res))
+    validate(need(!is.null(PLS$res),"Compute the model!"))
     req(!is.null(dati$DS))
     req(!is.null(input$pls_expvsfitted_rnames))
     require(gplots)
@@ -952,7 +954,8 @@ server <- function (input , output, session ){
   })
   
   output$pls_res_plot <- renderPlot({
-    req(!is.null(PLS$res))
+    # req(!is.null(PLS$res))
+    validate(need(!is.null(PLS$res),"Compute the model!"))
     req(!is.null(dati$DS))
     req(!is.null(input$pls_res_rnames))
     
@@ -1051,7 +1054,8 @@ server <- function (input , output, session ){
   })
   
   output$pls_scores_plot <- renderPlot({
-    req(!is.null(PLS$res))
+    # req(!is.null(PLS$res))
+    validate(need(!is.null(PLS$res),"Compute the model!"))
     req(!is.null(dati$DS))
     req(!is.null(input$pls_score_rnames))
     n1<-as.numeric(input$pls_score_compx)
@@ -1169,10 +1173,12 @@ server <- function (input , output, session ){
   })
   
   output$loading_pl <- renderPlot({
-    req(!is.null(PLS$res))
+    # req(!is.null(PLS$res))
+    validate(need(!is.null(PLS$res),"Compute the model!"))
     # req(!is.null(input$pls_load_rnames))
     require(stringr)
     require(gplots)
+    V <- explvar(PLS$res) 
     if(input$pls_radio_load_type=="sca"){
       req(!is.null(input$pls_load_rnames))
       n1<-as.integer(input$pls_load_compx)
@@ -1182,7 +1188,9 @@ server <- function (input , output, session ){
       if(as.logical(input$pls_load_rnames))tex<-row.names(T)
       Tlim<-c(min(T[,c(n1,n2)]),max(T[,c(n1,n2)]))
       Tlim<-c(sign(Tlim[1])*max(abs(Tlim)),sign(Tlim[2])*max(abs(Tlim)))
-      plot(T[,n1],T[,n2],xlab=paste('Component ',n1),ylab=paste('Component ',n2),
+      plot(T[,n1],T[,n2],
+           xlab=paste('Component ',n1,' (',as.character(round(V[n1],1)),'% of variance)',sep=''),
+           ylab=paste('Component ',n2,' (',as.character(round(V[n2],1)),'% of variance)',sep=''),
            main='X-loading Plot',type='n',xlim=Tlim,ylim=Tlim)
       text(T[,n1],T[,n2],tex,cex=0.6)
       text(0,0,'+',cex=1.2,col='red')
@@ -1191,13 +1199,28 @@ server <- function (input , output, session ){
         arrows(rep(0,dim(T)[1]),rep(0,dim(T)[2]),T[,n1],T[,n2],col='red')
     }
     if(input$pls_radio_load_type=="line"){
-      req(!is.null(input$pls_load_linecomp))
+      req(input$pls_load_linecomp)
+      # if(length(as.numeric(unlist(str_split(input$pls_load_linecomp,','))))==2){
+        # req(length(as.numeric(unlist(str_split(input$pls_load_linecomp,','))))==2)
       T<-loadings(PLS$res)
-      plot(T[,1],ylab='x-loading value',xlab='Variable number',type='n',ylim=c(min(T),max(T)))
       vi<-as.numeric(unlist(str_split(input$pls_load_linecomp,',')))
-      grid()
-      for(i in vi)lines(T[,i],col=i)
-      legend("bottomleft",legend=as.character(vi),col=vi,lty=1)
+      if(sum(is.na(vi))==0){
+        ylim <- c(min(T[,vi]),max(T[,vi]))
+        # ylim <- c(min(T),max(T))
+        plot(T[,1],ylab='x-loading value',
+             xlab='Variable number',type='n',
+             # ylim=c(min(T),max(T))
+             ylim=ylim
+        )
+        grid()
+        leg <- c(NULL);k=0
+        for(i in vi){
+          lines(T[,i],col=i)
+          k=k+1
+          leg[k] <- paste('Component ',i,' (',as.character(round(V[i],1)),'% of variance)',sep='')
+        }
+        legend("bottomleft",legend=leg,col=vi,lty=1)
+      }
     }
   })
   
@@ -1205,6 +1228,303 @@ server <- function (input , output, session ){
     filename = "loadings.xlsx",
     content = function(file) {
       df <- loadings(PLS$res)[,]
+      write.xlsx(df, file,colNames=TRUE)
+    })
+
+# PLS - biplot ------------------------------------------------------------
+  output$pls_biplot_compx <- renderUI({
+    req(!is.null(PLS$res))
+    selectInput("pls_biplot_compx", label = "Component on x-axis", 
+                choices = 1:as.numeric(input$pls_n_comp_df), 
+                selected = 1)
+  })
+  
+  output$pls_biplot_compy <- renderUI({
+    req(!is.null(PLS$res))
+    selectInput("pls_biplot_compy", label = "Component on y-axis", 
+                choices = 1:as.numeric(input$pls_n_comp_df), 
+                selected = 2)
+  })
+  
+  output$pls_biplot_arrows <- renderUI({
+    checkboxInput("pls_biplot_arrows", label = "Arrows", value = FALSE)
+  })
+  
+  output$biplot <- renderPlot({
+    # req(!is.null(PLS$res))
+    validate(need(!is.null(PLS$res),"Compute the model!"))
+    req(input$pls_biplot_compx)
+    req(input$pls_biplot_compy)
+    req(!is.null(input$pls_biplot_arrows))
+    
+    biplot(PLS$res,comps=c(as.numeric(input$pls_biplot_compx),as.numeric(input$pls_biplot_compy)),var.axes=as.logical(input$pls_biplot_arrows))
+    grid()
+  })
+
+
+# PLS - coefficients ------------------------------------------------------
+
+  output$pls_coeff_comp <- renderUI({
+    req(!is.null(PLS$res))
+    # req(input$pls_radio_load_type=='line')
+    textInput("pls_coeff_comp", label = "Number of latent (e.g.,1,3,5)", value = "1,2")
+  })
+
+  
+  
+  output$coeff_pl <- renderPlot({
+    validate(need(!is.null(PLS$res),"Compute the model!"))
+    # req(!is.null(PLS$res))
+    req(input$pls_coeff_comp)
+    if (is.null(PLS$res$scale))Cm<-PLS$res$coefficients[,1,]
+    if (!is.null(PLS$res$scale))Cm<-PLS$res$coefficients[,1,]/PLS$res$scale
+    vi<-as.numeric(unlist(str_split(input$pls_coeff_comp,',')))
+    #print(Cm)
+    nCm<-length(Cm[,1])
+    if(sum(is.na(vi))==0){
+      
+      plot(1:nCm,Cm[,1],xlab='Variable Number',ylab='Regression Coefficients',type='n',
+           ylim=c(min(Cm[,vi]),max(Cm[,vi])));grid()
+      for(i in vi)lines(Cm[,i],col=which(vi==i))
+      legend("bottomleft",legend=as.character(vi),col=1:length(vi),lty=1)
+      abline(0,0,lty=2)
+    }
+  })
+
+  output$pls_coeff_dwl <- downloadHandler(
+    filename = "coeff.xlsx",
+    content = function(file) {
+      if (is.null(PLS$res$scale))Cm<-PLS$res$coefficients[,1,]
+      if (!is.null(PLS$res$scale))Cm<-PLS$res$coefficients[,1,]/PLS$res$scale
+      # df <- loadings(PLS$res)[,]
+      write.xlsx(Cm, file,colNames=TRUE)
+    })
+  
+
+# PLS - prediction --------------------------------------------------------
+
+  output$lista_esempi_ext<-renderUI({
+    fnames<-list.files(path = 'Dati')
+    fext<-tools::file_ext(fnames)
+    fnames<-fnames[fext %in% c("xlsx")]
+    fnames<-tools::file_path_sans_ext(fnames)
+    selectInput('lista_esempi_ext',"Load data set to be predicted from the examples",choices = c('',fnames),selected = 1,
+                width="74%")
+  })
+
+  observeEvent(input$lista_esempi_ext,{
+    if(input$lista_esempi_ext!=""){
+      path<-paste("Dati/",input$lista_esempi_ext,".xlsx",sep="")
+      df <- tryCatch(
+        read_excel(path = path,sheet = 1,col_names = TRUE)
+        )
+      dati_ext$DS<-as.data.frame(df)
+      dati_ext$DS_nr <- as.data.frame(df)
+    }
+  })
+
+  output$pls_pred_data_paste_sp <- renderUI({
+    req(input$pls_pred_data_load=='paste')
+    br()
+  })
+  
+  output$pls_pred_data_paste_sp1 <- renderUI({
+    req(input$pls_pred_data_load=='paste')
+    hr()
+  })
+  
+  output$pls_pred_data_paste <- renderUI({
+    req(input$pls_pred_data_load=='paste')
+    actionButton("pls_pred_data_paste", label = "Paste")
+  })
+  
+  output$pls_pred_data_excel <- renderUI({
+    req(input$pls_pred_data_load=='excel')
+    fileInput("pls_pred_data_excel", " ",
+              multiple = FALSE,
+              accept = c(".xlx",".xlsx"))
+  })
+  
+  observeEvent(input$pls_pred_data_excel,{
+    df <- tryCatch(
+      read_excel(path = input$pls_pred_data_excel$datapath,sheet = 1,col_names = TRUE)  )
+    dati_ext$DS<-as.data.frame(df)
+    dati_ext$DS_nr <- as.data.frame(df)
+  })
+  
+  observeEvent(input$pls_pred_data_paste,{
+    df <- tryCatch(read.DIF(file = "clipboard",header = TRUE,transpose = TRUE),
+                   error = function(e) "Selezionare un dataset!")
+    df <- type.convert(df)
+    dati_ext$DS<-as.data.frame(df)
+    dati_ext$DS_nr <- as.data.frame(df)
+  })
+
+  output$pls_load_ds <- renderPrint({
+    validate(need(!is.null(dati_ext$DS),"No data set!"))
+    cat('Dimension loaded data set:',"\n")
+    cat(dim(dati_ext$DS))
+    
+    # str(PLS$res)
+  })
+
+  output$pls_pred_data_var_y<-renderUI({
+    req(input$pls_pred_y_chk==TRUE)
+    selectizeInput(inputId = "pls_pred_data_var_y"," ",
+                   choices = colnames(dati_ext$DS),
+                   options = list(
+                     placeholder = 'Select responce variable',
+                     onInitialize = I('function() { this.setValue(""); }')
+                   ))
+  })
+    
+  
+  
+  
+  
+  observeEvent(input$bplsext,{
+    if(is.null(PLS$res)){
+      sendSweetAlert(session, title = "Input Error",
+                     text = 'Compute the model!',
+                     type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
+    }else{
+      if(is.null(dati_ext$DS)){
+        sendSweetAlert(session, title = "Input Error",
+                       text = 'Load data set to be predicted!',
+                       type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
+      }else{
+        
+        
+        
+        M_<-dati_ext$DS
+        M_<-data.frame(M_)
+        # colnames(M_) <- colnames(dati_ext$DS)
+        if(input$pls_pred_y_chk){
+          # M_ <- dati_ext$DS[,colnames(dati_ext$DS)!=input$pls_pred_data_var_y]
+          # colnames(M_) <- colnames(dati_ext$DS[,colnames(dati_ext$DS)!=input$pls_pred_data_var_y])
+
+          Y_ <- dati_ext$DS[,input$pls_pred_data_var_y]
+
+
+        }else{
+
+          Y_<-rep(0,nrow(M_))
+
+        }
+
+        ncomp <- as.numeric(input$pls_n_comp_df)
+        
+      
+        prm<-drop(predict(PLS$res,newdata=M_,ncomp=1:ncomp,scale=PLS$scale))
+        PLS_ext$prm <- prm
+        prm.tr<-drop(predict(PLS$res,newdata=NULL,ncomp=1:ncomp,scale=PLS$scale))
+        PLS_ext$prm.tr <- prm.tr
+        
+
+        
+        if(input$pls_pred_y_chk){
+          rmsep<-RMSEP(PLS$res,ncomp=ncomp,scale=PLS$scale,
+                       intercept=FALSE)$val[1,,]
+          PLS_ext$rmsep <- rmsep
+          
+        }
+  
+        
+        if(nrow(M_)==1){
+          prm<-matrix(unlist(prm),1,ncomp)
+          PLS_ext$prm <- prm
+
+        }
+ 
+        res<-prm[,ncomp]-Y_
+        PLS_ext$res <- res
+
+        res.tr<-prm.tr[,ncomp]-PLS$dataset[,1]
+        PLS_ext$res.tr <- res.tr
+        
+
+        
+      }
+      }
+  })
+  
+  output$pls_pred_print <- renderPrint({
+    req(!is.null(PLS_ext$res))
+    if(input$pls_pred_y_chk){
+      cat('Prediction Statistics',"\n")
+      cat('',"\n")
+      cat(paste('RMSEP:',format(PLS_ext$rmsep,digits=4)),"\n")
+      cat(paste('BIAS :',format(mean(PLS_ext$res),digits=4)),"\n")
+      cat('',"\n")
+    }
+    cat('Predicted Values',"\n")
+    print(PLS_ext$prm[,as.numeric(input$pls_n_comp_df)])
+  })
+  
+  
+  output$pls_ext_data_rnames <- renderUI({
+    req(!is.null(PLS_ext$res))
+    checkboxInput("pls_ext_data_rnames", label = "Row names", value = FALSE)
+  })
+  
+  output$pls_pred_data_pl <- renderPlot({
+    req(!is.null(PLS_ext$res))
+    req(input$pls_pred_data_var_y)
+    req(input$pls_pred_y_chk==TRUE)
+    M_<-dati_ext$DS
+    M_<-data.frame(M_)
+    Y_ <- dati_ext$DS[,input$pls_pred_data_var_y]
+    ncomp <- as.numeric(input$pls_n_comp_df)
+    prm <- PLS_ext$prm
+    prm.tr <- PLS_ext$prm.tr
+    res <- PLS_ext$res
+    res.tr <- PLS_ext$res.tr
+    op<-par(pty='s',mfrow=c(1,2))
+    if(!input$pls_ext_data_rnames){
+      plot(Y_,prm[,ncomp],xlab='Experimental Value',ylab='Predicted Value',asp=1,
+           xlim=c(min(c(Y_,prm[,ncomp],prm.tr[,ncomp])),
+                  max(c(Y_,prm[,ncomp],prm.tr[,ncomp]))),
+           ylim=c(min(c(Y_,prm[,ncomp],prm.tr[,ncomp])),
+                  max(c(Y_,prm[,ncomp],prm.tr[,ncomp])))
+           )
+      lines(par('usr')[1:2],par('usr')[3:4],col='red')
+      grid()
+      plot(1:nrow(M_),res,xlab='Object Number',ylab='Residuals',
+           ylim=c(min(min(res),min(res.tr)),max(c(res,res.tr))))
+      abline(h=0,col="red")
+      grid()
+    }else{
+      plot(Y_,prm[,ncomp],xlab='Experimental Value',ylab='Predicted Value',asp=1,
+           xlim=c(min(c(Y_,prm[,ncomp],prm.tr[,ncomp])),
+                  max(c(Y_,prm[,ncomp],prm.tr[,ncomp]))),
+           ylim=c(min(c(Y_,prm[,ncomp],prm.tr[,ncomp])),
+                  max(c(Y_,prm[,ncomp],prm.tr[,ncomp]))),type='n')
+      text(Y_,prm[,ncomp],as.character(row.names(M_)))
+      lines(par('usr')[1:2],par('usr')[3:4],col='red')
+      grid()
+      plot(1:nrow(M_),res,xlab='Object Number',ylab='Residuals',type='n',
+           ylim=c(min(c(res,res.tr)),max(c(res,res.tr))))
+      text(1:nrow(M_),res,as.character(row.names(M_)))
+      abline(h=0,col="red")
+      grid()
+    }
+    par(op)
+  })
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  output$pls_coeff_dwl <- downloadHandler(
+    filename = "coeff.xlsx",
+    content = function(file) {
+      # if (is.null(PLS$res$scale))Cm<-PLS$res$coefficients[,1,]
+      # if (!is.null(PLS$res$scale))Cm<-PLS$res$coefficients[,1,]/PLS$res$scale
+      df <- PLS_ext$prm[,input$pls_n_comp_df]
       write.xlsx(df, file,colNames=TRUE)
     })
   
@@ -1219,836 +1539,8 @@ server <- function (input , output, session ){
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# PCA - biplot ------------------------------------------------------------
-
-output$pca_biplot_compx <- renderUI({
-  req(!is.null(PCA$res))
-  selectInput("pca_biplot_compx", label = "Component on x-axis", 
-              choices = 1:PCA$res@nPcs, 
-              selected = 1)
-})
-
-output$pca_biplot_compy <- renderUI({
-  req(!is.null(PCA$res))
-  selectInput("pca_biplot_compy", label = "Component on y-axis", 
-              choices = 1:PCA$res@nPcs, 
-              selected = 2)
-})
-
-output$pca_biplot_rnames <- renderUI({
-  checkboxInput("pca_biplot_rnames", label = "Row names", value = FALSE)
-})
-
-output$pca_biplot_cnames <- renderUI({
-  checkboxInput("pca_biplot_cnames", label = "Column names", value = FALSE)
-})
-
-output$pca_biplot_arrows <- renderUI({
-  checkboxInput("pca_biplot_arrows", label = "Arrows", value = FALSE)
-})
-
-output$biplot <- renderPlot({
-  req(!is.null(PCA$res))
-  req(!is.null(input$pca_biplot_rnames))
-  req(!is.null(input$pca_biplot_cnames))
-  req(!is.null(input$pca_biplot_arrows))
-
-  ans <- list()
-  ans[[1]] <- as.numeric(input$pca_biplot_compx)
-  ans[[2]] <- as.numeric(input$pca_biplot_compy)
-  ans[[3]] <- input$pca_biplot_rnames
-  ans[[4]] <- input$pca_biplot_cnames
-  ans[[5]] <- input$pca_biplot_arrows
-  
-  tex<-as.character(1:PCA$res@nObs)
-  if(ans[[3]])tex<-rownames(PCA$dataset)
-  
-  c1<-as.numeric(ans[[1]])
-  c2<-as.numeric(ans[[2]])
-  S<-PCA$res@scores
-  V<-PCA$res@R2
-  Slim<-c(min(S[,c(c1,c2)]),max(S[,c(c1,c2)]))
-  Slim<-c(sign(Slim[1])*max(abs(Slim)),sign(Slim[2])*max(abs(Slim)))
-  
-  if(PCA$type=='pca'){
-    xl<-paste('Component ',as.character(c1),' (',as.character(round(V[c1]*100,1)),'% of variance)',sep='')
-    yl<-paste('Component ',as.character(c2),' (',as.character(round(V[c2]*100,1)),'% of variance)',sep='')
-  }else{
-    xl<-paste('Factor ',as.character(c1),' (',as.character(round(V[c1]*100,1)),'% of variance)',sep='')
-    yl<-paste('Factor ',as.character(c2),' (',as.character(round(V[c2]*100,1)),'% of variance)',sep='')}
-  
-  tl=paste('Biplot (',as.character(round((V[c1]+V[c2])*100,1)),'% of total variance)',sep='')
-  op<-par(pty='s')
-  if(is.null(tex)){
-    plot(S[,c(c1,c2)],xlim=Slim,ylim=Slim,pty='o',xlab=xl,ylab=yl,col='black')
-  }else{
-    plot(S[,c(c1,c2)],xlim=Slim,ylim=Slim,xlab=xl,ylab=yl,type='n')
-    text(S[,c(c1,c2)],as.character(tex),col='black',cex=0.7)}
-  par(op)
-  # draw loading arrows
-  par(new=TRUE)
-  T<-PCA$res@loadings
-  tex<-1:nrow(T)
-  if(as.logical(ans[[4]]))tex<-rownames(T)
-  Tlim<-c(min(T[,c(c1,c2)]),max(T[,c(c1,c2)]))
-  Tlim<-c(sign(Tlim[1])*max(abs(Tlim)),sign(Tlim[2])*max(abs(Tlim)))
-  plot(T[,c(c1,c2)],axes=FALSE,type='n',xlim=Tlim,ylim=Tlim,pty='s',xlab=xl,ylab=yl)
-  if(as.logical(ans[[5]]))arrows(rep(0,dim(T)[1]),rep(0,dim(T)[2]),T[,c1],T[,c2],col='red')
-  text(T[,c1],T[,c2],as.character(tex),cex=0.7,col='red')
-  axis(side=4)
-  axis(side=3)
-  par(new=FALSE)
-  # draw centre and grid
-  grid()
-  text(0,0,'+',cex=1.2,col='red')
-  title(main=tl,line=2.5)
-})
-
-
-# PCA - correlation plot --------------------------------------------------
-
-output$pca_corr_compx <- renderUI({
-  req(!is.null(PCA$res))
-  selectInput("pca_corr_compx", label = "Component on x-axis", 
-              choices = 1:PCA$res@nPcs, 
-              selected = 1)
-})
-
-output$pca_corr_compy <- renderUI({
-  req(!is.null(PCA$res))
-  selectInput("pca_corr_compy", label = "Component on y-axis", 
-              choices = 1:PCA$res@nPcs, 
-              selected = 2)
-})
-
-output$pca_corr_rnames <- renderUI({
-  req(!is.null(PCA$res))
-  checkboxInput("pca_corr_rnames", label = "Row names", value = FALSE)
-})
-
-output$pca_corr_arrows <- renderUI({
-  req(!is.null(PCA$res))
-  checkboxInput("pca_corr_arrows", label = "Arrows", value = FALSE)
-})
-
-output$pca_corr_varsup <- renderUI({
-  req(!is.null(PCA$res))
-  req(!is.null(dati$var_ql))
-  varsupqt <- c(NULL)
-  for(vs in dati$var_ql){
-    if(is.numeric(dati$DS[,vs]))varsupqt <- c(varsupqt,vs)
-  }
-  pickerInput("pca_corr_varsup", label = "Variable sup.",
-              choices = varsupqt,
-              multiple = TRUE)
-})
-
-output$corr_pl <- renderPlot({
-  
-  circle <- function(center = c(0, 0), npoints = 1000) {
-    r = 1
-    tt = seq(0, 2 * pi, length = npoints)
-    xx = center[1] + r * cos(tt)
-    yy = center[1] + r * sin(tt)
-    return(data.frame(x = xx, y = yy))
-  }
-  corcir=circle()
-  
-  
-  
-  req(!is.null(PCA$res))
-  # require(stringr)
-  require(gplots)
-  
-  
-  req(!is.null(input$pca_corr_rnames))
-  
-  ans1 <- list()
-  ans1[[1]] <- as.numeric(input$pca_corr_compx)
-  ans1[[2]] <- as.numeric(input$pca_corr_compy)
-  ans1[[3]] <- 'None'
-  ans1[[4]] <- input$pca_corr_rnames
-  ans1[[5]] <- input$pca_corr_arrows
-  
-  op<-par(pty='s')
-  n1<-as.integer(ans1[[1]])
-  n2<-as.integer(ans1[[2]])
-  # T<-PCA$res@loadings
-  T <- sweep(PCA$res@loadings,2,PCA$res@sDev,"*")
-  V<-PCA$res@R2
-  siz=.9-log10(nrow(T))/10 # defines the size of the characters in the plots, based on the number of variables
-  tex<-as.character(1:nrow(T))
-  # if(ans[[3]]!='None'){
-  #   variable<-makevar(ans[[3]])
-  #   tex<-variable$value
-  # }
-  if(as.logical(ans1[[4]]))tex<-row.names(T)
-  
-  # Tlim<-c(min(T[,c(n1,n2)]),max(T[,c(n1,n2)]))
-  # Tlim<-c(sign(Tlim[1])*max(abs(Tlim)),sign(Tlim[2])*max(abs(Tlim)))
-  
-  x.lim.inf <- -1.01;x.lim.sup <- 1.01
-  y.lim.inf <- -1.01;y.lim.sup <- 1.01
-  if(PCA$scale==FALSE|PCA$center==FALSE){
-    x.lim.inf <- min(T[,n1]-0.01,-1.01);x.lim.sup <- max(T[,n1]+0.01,1.01)
-    y.lim.inf <- min(T[,n2]-0.01,-1.01);y.lim.sup <- max(T[,n2]+0.01,1.01)
-  }
-  
-  
-  if(PCA$type=='pca'){
-    plot(T[,n1],T[,n2],xlab=paste('Component ',as.character(n1),' (',as.character(round(V[n1]*100,1)),'% of variance)',sep=''),ylab=paste('Component ',as.character(n2),' (',as.character(round(V[n2]*100,1)),'% of variance)',sep=''),
-         main=paste('Correlation Plot (',as.character(round((V[n1]+V[n2])*100,1)),'% of total variance)',sep=''),type='n',
-         xlim=c(x.lim.inf,x.lim.sup),ylim=c(y.lim.inf,y.lim.sup),asp=1)
-  }else{
-    plot(T[,n1],T[,n2],xlab=paste('Factor ',as.character(n1),' (',as.character(round(V[n1]*100,1)),'% of variance)',sep=''),ylab=paste('Factor ',as.character(n2),' (',as.character(round(V[n2]*100,1)),'% of variance)',sep=''),
-         main=paste('Correlation Plot (',as.character(round((V[n1]+V[n2])*100,1)),'% of total variance)',sep=''),type='n',
-         xlim=c(x.lim.inf,x.lim.sup),ylim=c(y.lim.inf,y.lim.sup),asp=1)}
-  
-  text(T[,n1],T[,n2],tex,cex=siz) 
-  text(0,0,'+',cex=1.2,col='red')
-  points(x = corcir$x,y = corcir$y,cex=0.1,col='grey',type='l')
-  
-  grid()
-  
-  if(as.logical(ans1[[5]])){
-    arrows(rep(0,dim(T)[1]),rep(0,dim(T)[2]),T[,n1],T[,n2],0.1,col='red')}
-  
-  # var sup
-  
-  varsup<-input$pca_corr_varsup
-  if(!is.null(varsup)){
-    for(vs in varsup){
-      D<-NULL;S <- NULL
-      if(is.numeric(dati$DS[,vs])){
-        D<-dati$DS[,vs]
-        S<-cor(D,PCA$res@scores,use="complete.obs")
-        text(S[,n1],S[,n2],vs,cex=siz,col='blue')
-        if(as.logical(ans1[[5]]))arrows(0,0,S[,n1],S[,n2],0.1,col='blue',lty = 2)
-      }
-      
-    }
-  }
-})
-
-output$pca_corr_dwl <- downloadHandler(
-  filename = "correlations.xlsx", 
-  content = function(file) {
-    df <- sweep(PCA$res@loadings,2,PCA$res@sDev,"*")
-    df<-as.data.frame(df)
-    df<-cbind(' '= row.names(df),df)
-
-    varsup<-input$pca_corr_varsup
-    if(!is.null(varsup)){
-      for(vs in varsup){
-        # D<-NULL;S <- NULL
-        if(is.numeric(dati$DS[,vs])){
-          D<-dati$DS[,vs]
-          S<-cor(D,PCA$res@scores,use="complete.obs")
-          S<-as.data.frame(S)
-          S<-cbind(' '=vs,S)
-          df<-rbind.data.frame(df,S)
-        }
-      }
-    }
-
-    df
-    write.xlsx(df, file,colNames=TRUE)
-  })
-
-
-# PCA - variance variable explained ----------------------------------------
-
-output$pca_var_var_compN <- renderUI({
-  req(!is.null(PCA$res))
-  selectInput("pca_var_var_compN", label = "Number of components",
-              choices = 1:PCA$res@nPcs,
-              selected = 1)
-})
-
-output$var_var_pl <- renderPlot({
-  req(!is.null(PCA$res))
-  req(input$pca_var_var_compN)
-  require(chemometrics)
-  if(PCA$res@scaled=='uv')scale<-TRUE else scale<-FALSE
-  pcaVarexpl(PCA$dataset,a=as.numeric(input$pca_var_var_compN),scale=scale,center=PCA$res@centered,las=2,cex.names=0.7,mgp=c(3, .4, 0),
-                          main='Variance of each Variable explained')
-})
-
-output$pca_var_var_dwl <- downloadHandler(
-  filename = "variance_var.xlsx",
-  content = function(file) {
-    require(chemometrics)
-    if(PCA$res@scaled=='uv')scale<-TRUE else scale<-FALSE
-    varexp <- pcaVarexpl(PCA$dataset,a=as.numeric(input$pca_var_var_compN),scale=scale,center=PCA$res@centered,las=2,cex.names=0.7,mgp=c(3, .4, 0),
-                 main='Variance of each Variable explained')
-    df <- as.data.frame(varexp$ExplVar)
-    colnames(df) <- 'var_expl'
-    df<-cbind.data.frame(' '=rownames(df),df)
-    write.xlsx(df, file,colNames=TRUE)
-  })
-
-# PCA - missing data reconstruction ---------------------------------------
-
-output$pca_missdata_n_comp_max<-renderUI({
-  req(dati$DS)
-  selectInput("pca_missdata_n_comp_max", label = "Max. number of components for reconstruction", 
-              choices = c(2:length(dati$var_qt)), 
-              selected = length(dati$var_qt))
-})
-
-observeEvent(input$bpcamodel_miss,{
-  if(sum(apply(dati$DS[,dati$var_qt],2,'is.numeric'))!=ncol(dati$DS[,dati$var_qt])){
-    sendSweetAlert(session, title = "Input Error",
-                   text = 'Le variabili qualitative devono essere selezionate come supplementari!',
-                   type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
-  }else{
-  require(pcaMethods)
-  
-  ans <- list()
-  ans[[4]] <- input$pca_missdata_n_comp_max
-  ans[[5]] <- input$pca_missdata_center
-  ans[[6]] <- input$pca_missdata_scale
-  
-  M_<-as.data.frame(dati$DS[,dati$var_qt])
-  M_0<-M_
-  
-  if((typeof(M_)=='double')|(typeof(M_)=='list')){
-    # previous.name<-ans[[1]]
-    M.na<-is.na(M_)
-    if(sum(is.na(M_))!=0){
-      sc<-"none"
-      if(as.logical(ans[[6]]))sc<-"uv"
-      pre<-as.logical(ans[[5]])
-      npc<-min(as.numeric(ans[[4]]),dim(M_))
-      res<-pca(M_,method="nipals",center=pre,scale=sc,nPcs=npc)
-      PCA_miss$res <- res
-    }else{
-      sendSweetAlert(session, title = "Input Error",
-                      text = 'No Missing Data!',
-                      type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
-     
-      }
-  }
-  }
-})
-      
-output$pca_miss_pl <- renderPlot({  
-  req(!is.null(PCA_miss$res))
-      # V_<-PCA_miss$res@R2*100
-      require(ggplot2)
-      df<-data.frame(x=1:PCA_miss$res@nPcs, y=PCA_miss$res@R2*100)
-      gg<-ggplot(df, aes(x, y))+ggtitle("% Explained Variance")
-      gg<- gg+ geom_point(colour='red', size = 2)+geom_line(colour='blue')+theme_light()
-      # gg<- gg+ scale_x_continuous(breaks = function(x) unique(floor(pretty(seq(0, (max(x) + 1) * 1.1)))))
-      gg<- gg+ scale_x_continuous(breaks = 1:PCA_miss$res@nPcs)
-      gg<- gg+ xlab("Component Number")
-      gg<- gg+ ylab("% Explained Variance")
-      print(gg)
-})
-
-output$pca_missdata_n_comp<-renderUI({
-  req(!is.null(PCA_miss$res))
-  selectInput("pca_missdata_n_comp", label = "Number of components for reconstruction",
-              choices = c(2:PCA_miss$res@nPcs),
-              selected = PCA_miss$res@nPcs)
-})
-
-output$bpcamodel_miss_rec <- renderUI({
-  req(!is.null(PCA_miss$res))
-  actionButton("bpcamodel_miss_rec", label = "Reconstruction")
-})
-
-observeEvent(input$bpcamodel_miss_rec,{
-  req(!is.null(PCA_miss$res))
-  req(input$pca_missdata_n_comp)
-  
-  M_<-as.data.frame(dati$DS[,dati$var_qt])
-  M.na<-is.na(M_)
-
-  npc<-input$pca_missdata_n_comp
-  pre<-input$pca_missdata_center
-  
-  M.rec<-fitted(PCA_miss$res,nPcs=npc,pre=pre,post=TRUE)
-  
-  M.rec[!M.na]<-M_[!M.na]
-  M.rec<-as.data.frame(M.rec)
-  names(M.rec)<-names(M_)
-  row.names(M.rec)<-row.names(M_)
-  
-  PCA_miss$DS_rec <- M.rec
-
-})
-
-output$pca_missdata_cmpl <- renderPrint({
-  req(!is.null(PCA_miss$res))
-  head(PCA_miss$DS_rec)
-})
-
-output$pca_missdata_dwl <- downloadHandler(
-  filename = "completed.xlsx",
-  content = function(file) {
-    df <- as.data.frame(PCA_miss$DS_rec)
-    df<-cbind.data.frame(' '=rownames(df),df)
-    write.xlsx(df, file,colNames=TRUE)
-  })
-
-
-# PCA - randomization test ------------------------------------------------
-
-observeEvent(input$brnd_test,{
-  if(is.null(PCA$res)){
-    sendSweetAlert(session, title = "Input Error",
-                   text = 'Run PCA Model First!',
-                   type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
-  }else{
-    require(pcaMethods)
-    set.seed(as.numeric(Sys.time()))
-    nr <- dim(PCA$dataset)[1];nc <- dim(PCA$dataset)[2]
-    n <- as.numeric(input$rnd_test_N)
-    var_rnd <- data.frame(matrix(rep(0,n*as.numeric(PCA$res@nPcs)),nrow = n))
-    withProgress(message = 'Randomization:',value = 0, {
-    for(i in 1:n){
-      incProgress(detail = paste("NumRnd", i),amount = 1/n)
-      M_ <- data.frame(matrix(rnorm(n = nr*nc),nrow = nr))
-      sgt<-as.integer(PCA$res@nPcs)
-      if(!PCA$scale)sgt<-sum(apply(M_,2,var))
-      ccs<-'none';if(PCA$scale)ccs<-'uv'
-      md<-prep(M_,scale=ccs,center=PCA$center,simple=FALSE,rev=FALSE)
-      res<-pca(md$data,method="nipals",nPcs=as.numeric(PCA$res@nPcs),scale=ccs,center=PCA$center)
-      var_rnd[i,] <- res@R2*100
-    }
-    })
-  PCA$rnd <- var_rnd
-  }
-})
-
-output$rnd_test_pl <- renderPlot({
-  req(!is.null(PCA$rnd))
-  n <- as.numeric(input$rnd_test_N)
-  var_rnd_mean <- apply(PCA$rnd,2,FUN = 'mean')
-  var_rnd_sd <- apply(PCA$rnd,2,FUN = 'sd')
-  var_rnd_ic_sup <- var_rnd_mean+qt(p = 0.975,df = n-1)*var_rnd_sd*(1+1/sqrt(n)) # rispetto CAT ho messo *(1+1/sqrt(n))
-  var_rnd_ic_inf <- var_rnd_mean-qt(p = 0.975,df = n-1)*var_rnd_sd*(1+1/sqrt(n))
-  require(ggplot2)
-  df<-data.frame(x=1:PCA$res@nPcs, y=PCA$res@R2*100)
-  if(input$pca_var_type=="scree")gg<-ggplot(df, aes(x, y))+ggtitle("% Explained Variance")
-  if(input$pca_var_type=="cum")gg<-ggplot(df, aes(x, y=cumsum(y)))+ggtitle("Cumulative Explained Variance")
-  gg<- gg+ geom_point(colour='red', size = 2)+geom_line(colour='blue')+theme_light()
-  gg<- gg+ scale_x_continuous(breaks = 1:PCA$res@nPcs)
-  gg<- gg+ xlab("Component Number")
-  gg<- gg+ ylab("% Explained Variance")
-  # girafe(code = print(gg))
-  gg <- gg+theme(aspect.ratio=1,axis.text = element_text(size = 10),axis.title = element_text(size = 15))
-  df_m <- data.frame(x=1:PCA$res@nPcs,y=var_rnd_mean)
-  gg <- gg+geom_line(data = df_m,mapping = aes(x=x,y=y),colour='darkgreen',linetype = "dashed")
-  df_s <- data.frame(x=1:PCA$res@nPcs,y=var_rnd_ic_sup)
-  gg <- gg+geom_line(data = df_s,mapping = aes(x=x,y=y),colour='darkgreen',linetype = "dotted")
-  df_i <- data.frame(x=1:PCA$res@nPcs,y=var_rnd_ic_inf)
-  gg <- gg+geom_line(data = df_i,mapping = aes(x=x,y=y),colour='darkgreen',linetype = "dotted")
-  print(gg)
-})
-
-# PCA - diagnostic: T2 and Q -----------------------------------------------
-
-output$pca_dia_t2andq_title<-renderUI({
-  if(input$pca_dia_t2andq_type== "t2andq")titolo <- HTML("T <sup>2</sup> and Q")
-  if(input$pca_dia_t2andq_type=='t2vsq')titolo <-HTML("T <sup>2</sup> vs Q (influence plot)")
-  titolo
-})
-
-output$pca_dia_t2andq_compN <- renderUI({
-  req(!is.null(PCA$res))
-  selectInput("pca_dia_t2andq_compN", label = "Number of components",
-              choices = 1:PCA$res@nPcs,
-              selected = 1)
-})
-
-observeEvent(input$pca_dia_t2andq_compN,{
-  if(!is.null(PCA$res)){
-    if(sum(PCA$res@missing)>0){
-      sendSweetAlert(session, title = "Input Error",
-                     text = paste('Program aborted because of presence of', sum(PCA$res@missing),
-                                  'missing data'),
-                     type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
-    }else{
-      if(PCA$type=='pca'){
-        ncp<-as.numeric(input$pca_dia_t2andq_compN)
-        n<-PCA$res@nObs
-        m<-PCA$res@nVar
-        X<-as.matrix(PCA$res@completeObs)
-        P<-as.matrix(PCA$res@loadings[,1:ncp])
-        L<-as.vector((PCA$res@sDev[1:ncp])^2)
-        MQ<-diag(rep(1,m))-(P%*%t(P))
-        MT<-P%*% (diag(length(L))*(1/L))%*%t(P)
-        Q<-diag(X%*%MQ%*%t(X))
-        T<-diag(X%*%MT%*%t(X))
-
-        PCA$T2 <- T
-        PCA$Q <- Q
-
-      }else{
-        sendSweetAlert(session, title = "Input Error",
-                       text = 'Function not allowed with Varimax!',
-                       type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
-
-      }
-    }
-  }else{
-    sendSweetAlert(session, title = "Input Error",
-                   text = 'Run PCA Model First!',
-                   type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)}
-})
-
-output$pca_dia_t2andq_rn <- renderUI({
-  req(input$pca_dia_t2andq_type== "t2vsq")
-  radioButtons("pca_dia_t2andq_rn", " ",
-               choices = c("Rows number" = "rnum", "Rows name" = "rname"))
-})
-
-output$pca_dia_t2andq_joint <- renderUI({
-  req(input$pca_dia_t2andq_type== "t2vsq")
-  checkboxInput("pca_dia_t2andq_joint", label = "Joint diagnostics", value = FALSE)
-})
-
-output$pca_dia_t2andq_pl <- renderPlot({
-  req(!is.null(PCA$res))
-  req(!is.null(PCA$Q))
-  req(!is.null(PCA$T2))
-  
-  Q <- as.numeric(PCA$Q)
-  T <- as.numeric(PCA$T2)
-  ncp<-as.numeric(input$pca_dia_t2andq_compN)
-  n<-PCA$res@nObs
-  m<-PCA$res@nVar
-  
-  Qlim<-10^(mean(log10(Q))+qt(0.95,n-1)*sd(log10(Q)))
-  Qlim2<-10^(mean(log10(Q))+qt(0.99,n-1)*sd(log10(Q)))
-  Qlim3<-10^(mean(log10(Q))+qt(0.999,n-1)*sd(log10(Q)))
-  Tlim<-(n-1)*ncp/(n-ncp)*qf(0.95,ncp,n-ncp)
-  Tlim2<-(n-1)*ncp/(n-ncp)*qf(0.99,ncp,n-ncp)
-  Tlim3<-(n-1)*ncp/(n-ncp)*qf(0.999,ncp,n-ncp)
-  
-  if(is.na(Tlim))Tlim<-0
-  mT<-max(T,Tlim)
-  if(is.na(Qlim))Qlim<-0
-  mQ<-max(Q,Qlim)
-  
-  if(input$pca_dia_t2andq_type== "t2andq"){
-    op<-par(mfrow=c(1,2))
-    plot(Q,ylim=c(0,1.1*mQ),ylab="Q",xlab="Sample number",cex.lab=1.2)
-    abline(h=Qlim,col='red')
-    abline(h=Qlim2,lty=2,col='red')
-    abline(h=Qlim3,lty=3,col='red')
-    xtx<-(1:n)[Q>Qlim];ytx<-Q[Q>Qlim];tx<-as.character(xtx)
-    if(length(xtx)!=0)text(xtx,ytx,label=tx,cex=0.5,pos=3)
-    #title(main=paste("Lines: crit. val. at p=0.05, 0.01, 0.001 Number of components: ",ncp),cex.main=0.6)
-    title(main=paste("Lines: crit. val. at p=0.05, 0.01, 0.001 -",ncp,"components"),cex.main=0.6)
-    plot(T,ylim=c(0,mT*1.1),ylab="T^2",xlab="Sample number",cex.lab=1.2)
-    abline(h=Tlim,col='red')
-    abline(h=Tlim2,lty=2,col='red')
-    abline(h=Tlim3,lty=3,col='red')
-    xtx<-(1:n)[T>Tlim];ytx<-T[T>Tlim];tx<-as.character(xtx)
-    if(length(xtx)!=0)text(xtx,ytx,label=tx,cex=0.5,pos=3)
-    title(main=paste("Lines: crit. val. at p=0.05, 0.01, 0.001 -",ncp,"components"),cex.main=0.6);par(op)
-  }
-  if(input$pca_dia_t2andq_type== "t2vsq"){
-    req(!is.null(input$pca_dia_t2andq_rn))
-    
-    plot(T,Q,cex=0.5,ylim=c(0,mQ*1.1),xlim=c(0,mT*1.1),ylab="Q Index",xlab="T^2 Hotelling Index",cex.lab=1.2)
-    title(main=paste("Number of components:",ncp),sub='Lines show critical values (solid: p=0.05; dashed: p=0.01; dotted: p=0.001) - Outliers coded according to their line number',cex.sub=0.6)
-    grid()
-    abline(v=Tlim,col='red')
-    abline(h=Qlim,col='red')
-    abline(v=Tlim2,lty=2,col='red')
-    abline(h=Qlim2,lty=2,col='red')
-    abline(v=Tlim3,lty=3,col='red')
-    abline(h=Qlim3,lty=3,col='red')
-    if((Tlim!=0)|(Qlim!=0)){
-      txt<-1:n
-      if(input$pca_dia_t2andq_rn=='rname')txt<-row.names(PCA$dataset)
-      QT<-data.frame(Q=Q,T=T,tx=txt) 
-      QTs<-subset(QT,((T>Tlim)|(Q>Qlim)))
-      if(nrow(QTs)!=0)text(QTs$T,QTs$Q,label=QTs$tx,cex=0.5,pos=3)
-      rm(QT,QTs)}
-    if(input$pca_dia_t2andq_joint==TRUE){
-      Qlim<-10^(mean(log10(Q))+qt(0.974679,n-1)*sd(log10(Q)))
-      Qlim2<-10^(mean(log10(Q))+qt(0.994987,n-1)*sd(log10(Q)))
-      Qlim3<-10^(mean(log10(Q))+qt(0.9995,n-1)*sd(log10(Q)))
-      Tlim<-(n-1)*ncp/(n-ncp)*qf(0.974679,ncp,n-ncp)
-      Tlim2<-(n-1)*ncp/(n-ncp)*qf(0.994987,ncp,n-ncp)
-      Tlim3<-(n-1)*ncp/(n-ncp)*qf(0.9995,ncp,n-ncp)
-    }
-    if(is.na(Tlim))Tlim<-0
-    mT<-max(T,Tlim)
-    if(is.na(Qlim))Qlim<-0
-    mQ<-max(Q,Qlim)
-    # dev.new(title="influence plot joint diagnostics")
-    plot(T,Q,cex=0.5,ylim=c(0,mQ*1.1),xlim=c(0,mT*1.1),ylab="Q Index",xlab="T^2 Hotelling Index",cex.lab=1.2)
-    if(input$pca_dia_t2andq_joint==TRUE){
-      title(main=paste("Joint diagnostics - Number of components:",ncp),sub='Boxes define acceptancy regions (solid: p=0.05; dashed: p=0.01; dotted: p=0.001) - Outliers coded according to their line number',cex.sub=0.6)
-    }else{
-      title(main=paste("Number of components:",ncp),sub='Lines show critical values (solid: p=0.05; dashed: p=0.01; dotted: p=0.001) - Outliers coded according to their line number',cex.sub=0.6)
-    }
-    grid()
-    abline(v=Tlim,col='red')
-    abline(h=Qlim,col='red')
-    abline(v=Tlim2,lty=2,col='red')
-    abline(h=Qlim2,lty=2,col='red')
-    abline(v=Tlim3,lty=3,col='red')
-    abline(h=Qlim3,lty=3,col='red')
-    if((Tlim!=0)|(Qlim!=0)){
-      txt<-1:n
-      if(input$pca_dia_t2andq_rn=='rname')txt<-row.names(PCA$dataset)
-      QT<-data.frame(Q=Q,T=T,tx=txt) 
-      QTs<-subset(QT,((T>Tlim)|(Q>Qlim)))
-      if(nrow(QTs)!=0)text(QTs$T,QTs$Q,label=QTs$tx,cex=0.5,pos=3)
-    }
-  }
-})
-
-output$pca_dia_t2andq_dwl <- downloadHandler(
-  filename = "t2q.xlsx",
-  content = function(file) {
-    df <- cbind.data.frame(t2=PCA$T2,q=PCA$Q)
-    df <- as.data.frame(df)
-    df<-cbind.data.frame(' '=rownames(df),df)
-    write.xlsx(df, file,colNames=TRUE)
-  })
-
-# PCA - diagnostic: T2 contribution -----------------------------------------------
-
-output$pca_dia_t2contr_compN <- renderUI({
-  req(!is.null(PCA$res))
-  selectInput("pca_dia_t2contr_compN", label = "Number of components",
-              choices = 1:PCA$res@nPcs,
-              selected = 2)
-})
-
-output$pca_dia_t2contr_nr <- renderUI({
-  req(!is.null(PCA$res))
-  selectInput("pca_dia_t2contr_nr", label = "Row number",
-              choices = 1:PCA$res@nObs,
-              selected = 1)
-})
-
-output$pca_dia_t2contr_pl <- renderPlot({
-  req(!is.null(PCA$res))
-  
-  pcaconplot<-function(i,PCA,n,m,ncp,lbl,nm){
-    X<-as.matrix(PCA$res@completeObs)
-    name_r <- rownames(as.data.frame(X))[i]
-    P<-PCA$res@loadings[,1:ncp]
-    S<-PCA$res@scores[,1:ncp]
-    Ls<-PCA$res@sDev[1:ncp]#not variance because the sum must be the Malanobis distance
-    sgl<-sum(Ls)
-    sgr<-PCA$sgt-sgl
-    MT<-P%*%diag(1/Ls,ncp,ncp)%*%t(P)
-    T<-X%*%MT
-    Ti<-T[i,]
-    
-    minT<-min(Ti)
-    maxT<-max(Ti)
-    if(minT>0){minT<-0}
-    if(maxT<0){maxT<-0}
-    Tlim<-c(minT,maxT)
-    
-    if(nm){
-      Ti<-Ti/apply(abs(T),2,quantile,probs=0.95)
-      Tlim<-c(min(Ti,-1.1),max(Ti,1.1))
-    }
-
-    options(scipen=1)
-    barplot2(Ti,main=paste('T^2 of object',name_r),ylim=Tlim,
-             cex.lab=1.2,names.arg=lbl,cex.names=0.6,plot.grid=TRUE,las=2,cex.axis=0.6)
-    box(which="plot",lty="solid")
-    if(nm)abline(h=1,col='red')
-    if(nm)abline(h=-1,col='red')
-    return(Ti)
-  }
-
-  library(gplots)
-
-    if(PCA$type=='pca'){
-      req(input$pca_dia_t2contr_nr)
-      req(input$pca_dia_t2contr_compN)
-      # req(input$pca_dia_t2contr_norm)
-      
-      vc<-as.numeric(input$pca_dia_t2contr_nr)
-      ncp<-as.numeric(input$pca_dia_t2contr_compN)
-      nm<-input$pca_dia_t2contr_norm
-      nc<-PCA$res@nVar
-      nr<-PCA$res@nObs
-      lbl<-names(as.data.frame(PCA$dataset))
-      if(ncp<=nc){
-        PCA$d_T2 <- pcaconplot(vc,PCA,nr,nc,ncp,lbl,nm)
-      }else{
-        sendSweetAlert(session, title = "Input Error",
-                       text = 'Number of component greater than number of variables!',
-                       type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
-      }
-    }else{
-      sendSweetAlert(session, title = "Input Error",
-                     text = 'Function not allowed with Varimax!',
-                     type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)}
-})
-
-output$pca_dia_t2contr_dwl <- downloadHandler(
-  filename = "t2contr.xlsx",
-  content = function(file) {
-    df <- cbind.data.frame(PCA$d_T2)
-    df <- as.data.frame(df)
-    colnames(df) <- 'T2'
-    df<-cbind.data.frame(' '=rownames(df),df)
-    write.xlsx(df, file,colNames=TRUE)
-  })
-
-# PCA - diagnostic: Q contribution -----------------------------------------------
-
-output$pca_dia_qcontr_compN <- renderUI({
-  req(!is.null(PCA$res))
-  selectInput("pca_dia_qcontr_compN", label = "Number of components",
-              choices = 1:PCA$res@nPcs,
-              selected = 2)
-})
-
-output$pca_dia_qcontr_nr <- renderUI({
-  req(!is.null(PCA$res))
-  selectInput("pca_dia_qcontr_nr", label = "Row number",
-              choices = 1:PCA$res@nObs,
-              selected = 1)
-})
-
-output$pca_dia_qcontr_pl <- renderPlot({
-  req(!is.null(PCA$res))
-  
-  pcaconplot<-function(i,PCA,n,m,ncp,lbl,nm){
-    X<-as.matrix(PCA$res@completeObs)
-    name_r <- rownames(as.data.frame(X))[i]
-    P<-PCA$res@loadings[,1:ncp]
-    S<-PCA$res@scores[,1:ncp]
-    Ls<-PCA$res@sDev[1:ncp]#not variance because the sum must be the Malanobis distance
-    sgl<-sum(Ls)
-    sgr<-PCA$sgt-sgl
-    MQ<-S%*%t(P)
-    Q<-sign(X-MQ)*(X-MQ)^2
-    Qi<-Q[i,]
-    
-    minQ<-min(Qi)
-    maxQ<-max(Qi)
-    if(minQ>0){minQ<-0}
-    if(maxQ<0){maxQ<-0}
-    Qlim<-c(minQ,maxQ)
-    
-    if(nm){
-      Qi<-Qi/apply(abs(Q),2,quantile,probs=0.95)
-      Qlim<-c(min(Qi,-1.1),max(Qi,1.1))
-    }
-
-    options(scipen=1)
-    barplot2(Qi,main=paste('Q of object',name_r),ylim=Qlim,
-             cex.lab=1.2,names.arg=lbl,cex.names=0.6,plot.grid=TRUE,las=2,cex.axis=0.6)
-    box(which="plot",lty="solid")
-    if(nm)abline(h=1,col='red')
-    if(nm)abline(h=-1,col='red')
-    return(Qi)
-  }
-  
-  
-  library(gplots)
-
-    if(sum(PCA$res@missing)>0){
-      mess<-paste('Not possible to compute Q diagnostics with', sum(PCA$res@missing),'missing data')
-      sendSweetAlert(session, title = "Input Error",
-                     text = mess,
-                     type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
-    }else{
-      if(PCA$type=='pca'){
-        req(input$pca_dia_qcontr_nr)
-        req(input$pca_dia_qcontr_compN)
-        # req(input$pca_dia_qcontr_norm)
-        
-        vc<-as.numeric(input$pca_dia_qcontr_nr)
-        ncp<-as.numeric(input$pca_dia_qcontr_compN)
-        nm<-as.logical(input$pca_dia_qcontr_norm)
-        nc<-PCA$res@nVar
-        nr<-PCA$res@nObs
-        lbl<-names(as.data.frame(PCA$dataset))
-        if(ncp<=nc){
-          PCA$d_Q <- pcaconplot(vc,PCA,nr,nc,ncp,lbl,nm)
-        }else{
-          sendSweetAlert(session, title = "Input Error",
-                         text = 'Number of component greater than number of variables!',
-                         type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
-        }
-      }else{
-        sendSweetAlert(session, title = "Input Error",
-                       text = 'Function not allowed with Varimax!',
-                       type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)}
-    }
-})
-
-output$pca_dia_qcontr_dwl <- downloadHandler(
-  filename = "qcontr.xlsx",
-  content = function(file) {
-    df <- cbind.data.frame(PCA$d_Q)
-    df <- as.data.frame(df)
-    colnames(df) <- 'Q'
-    df<-cbind.data.frame(' '=rownames(df),df)
-    write.xlsx(df, file,colNames=TRUE)
-  })
-
   # PCA - ext data projection -----------------------------------------------
-  output$pca_ext_data_paste_sp <- renderUI({
-    req(input$pca_ext_data_load=='paste')
-    br()
-  })
   
-  output$pca_ext_data_paste_sp1 <- renderUI({
-    req(input$pca_ext_data_load=='paste')
-    hr()
-  })
-  
-  output$pca_ext_data_paste <- renderUI({
-    req(input$pca_ext_data_load=='paste')
-    actionButton("pca_ext_data_paste", label = "Paste")
-  })
-  
-  output$pca_ext_data_excel <- renderUI({
-    req(input$pca_ext_data_load=='excel')
-    fileInput("pca_ext_data_excel", " ",
-              multiple = FALSE,
-              accept = c(".xlx",".xlsx"))
-  })
-  
-  observeEvent(input$pca_ext_data_excel,{
-    df <- tryCatch(
-      read_excel(path = input$pca_ext_data_excel$datapath,sheet = 1,col_names = TRUE)  )
-    dati_ext$DS<-as.data.frame(df)
-    dati_ext$DS_nr <- as.data.frame(df)
-  })
-  
-  observeEvent(input$pca_ext_data_paste,{
-    df <- tryCatch(read.DIF(file = "clipboard",header = TRUE,transpose = TRUE),
-                   error = function(e) "Selezionare un dataset!")
-    df <- type.convert(df)
-    dati_ext$DS<-as.data.frame(df)
-    dati_ext$DS_nr <- as.data.frame(df)
-  })
 
   output$pca_ext_data_varnames <- renderUI({
     req(!is.null(dati_ext$DS_nr))
@@ -2284,385 +1776,6 @@ output$pca_dia_qcontr_dwl <- downloadHandler(
       write.xlsx(df, file,colNames=TRUE)
     })
   
-# PCA - ext diagnostic: T2 and Q ----------------------------------------------- 
-
-  output$pca_ext2q_compN <- renderUI({
-    req(!is.null(PCA$res))
-    selectInput("pca_ext2q_compN", label = "Number of components",
-                choices = 1:PCA$res@nPcs,
-                selected = 2)
-  })
-
-  output$pca_ext_data_t2q_lab <- renderUI({
-    req(!is.null(dati_ext$DS))
-    req(!is.null(input$pca_ext_data_varsup))
-    pickerInput("pca_ext_data_t2q_lab", label = "Label variable",
-                choices = input$pca_ext_data_varsup,
-                options =  list(
-                  "max-options" = 1,
-                  "max-options-text" = "No more!"
-                ),
-                multiple = TRUE)
-  })
-  
-  output$pca_dia_ext_t2andq_pl <- renderPlot({
-    req(!is.null(PCA$res))
-    req(!is.null(PCA_ext$scores))
-    
-    pcanewdia<-function(PCA,n,m,ncp,M,lbd){
-      X<-as.matrix(PCA$res@completeObs)
-      P<-as.matrix(PCA$res@loadings[,1:ncp])
-      L<-as.vector((PCA$res@sDev[1:ncp])^2)
-      MQ<-diag(rep(1,m))-(P%*%t(P))
-      MT<-P%*%(diag(length(L))*(1/L))%*%t(P)
-      Q<-diag(X%*%MQ%*%t(X))
-      T<-diag(X%*%MT%*%t(X))
-      
-      # new dataset evaluation
-      nr<-nrow(M)
-      nc<-ncol(M)
-      unity<-matrix(rep(1,nr),nr,1)
-      if(PCA$center)M<-M-(unity%*%PCA$centered)
-      if(PCA$scale)M<-M/(unity%*%PCA$scaled)
-      M<-as.matrix(M)
-      QN<-diag(M%*%MQ%*%t(M))
-      TN<-diag(M%*%MT%*%t(M))
-
-      if(input$pca_dia_ext_t2andq_joint==FALSE){
-        Qlim<-10^(mean(log10(Q))+qt(0.95,n-1)*sd(log10(Q)))
-        Tlim<-(n-1)*ncp/(n-ncp)*qf(0.95,ncp,n-ncp)
-        Qlim2<-10^(mean(log10(Q))+qt(0.99,n-1)*sd(log10(Q)))
-        Tlim2<-(n-1)*ncp/(n-ncp)*qf(0.99,ncp,n-ncp)
-        Qlim3<-10^(mean(log10(Q))+qt(0.999,n-1)*sd(log10(Q)))
-        Tlim3<-(n-1)*ncp/(n-ncp)*qf(0.999,ncp,n-ncp)
-        if(is.na(Tlim))Tlim<-0
-        if(is.na(Qlim))Qlim<-0
-        
-        mQ<-max(Q,QN,Qlim)
-        mT<-max(T,TN,Tlim)
-        
-        plot(T,Q,ylim=c(0,mQ*1.05),xlim=c(0,mT*1.05),cex=0.5, 
-             ylab="Q Index",xlab="T^2 Hotelling Index",cex.lab=1.2)
-        grid()
-        tl<-paste("Number of components:",ncp)
-        title(main=tl,sub='Train.: black - Ext.: red - Lines show critical values (solid: p=0.05; dashed: p=0.01; dotted: p=0.001)',cex.main=1.2,font.main=2,
-              col.main="black",cex.sub=0.6,font.sub=2,col.sub="red")
-        abline(v=Tlim,col='red')
-        abline(h=Qlim,col='red')
-        abline(v=Tlim2,lty=2,col='red')
-        abline(h=Qlim2,lty=2,col='red')
-        abline(v=Tlim3,lty=3,col='red')
-        abline(h=Qlim3,lty=3,col='red')
-        if(is.null(lbd))points(TN,QN,col='red')
-        if(!is.null(lbd))text(TN,QN,as.character(lbd),col='red',cex=0.6)
-      }
-      
-      if(input$pca_dia_ext_t2andq_joint==TRUE){
-        Qlim<-10^(mean(log10(Q))+qt(0.974679,n-1)*sd(log10(Q)))
-        Tlim<-(n-1)*ncp/(n-ncp)*qf(0.974679,ncp,n-ncp)
-        Qlim2<-10^(mean(log10(Q))+qt(0.994987,n-1)*sd(log10(Q)))
-        Tlim2<-(n-1)*ncp/(n-ncp)*qf(0.994987,ncp,n-ncp)
-        Qlim3<-10^(mean(log10(Q))+qt(0.9995,n-1)*sd(log10(Q)))
-        Tlim3<-(n-1)*ncp/(n-ncp)*qf(0.9995,ncp,n-ncp)
-        
-        mQ<-max(Q,QN,Qlim)
-        mT<-max(T,TN,Tlim)
-        
-        plot(T,Q,ylim=c(0,mQ*1.05),xlim=c(0,mT*1.05),cex=0.5, 
-             ylab="Q Index",xlab="T^2 Hotelling Index",cex.lab=1.2)
-        grid()
-        tl<-paste("Joint diagnostics - Number of components:",ncp)
-        title(main=tl,sub='Train.: black - Ext.: red - Boxes define acceptancy regions (solid: p=0.05; dashed: p=0.01; dotted: p=0.001)',cex.main=1.2,font.main=2,
-              col.main="black",cex.sub=0.6,font.sub=2,col.sub="red")
-        abline(v=Tlim,col='red')
-        abline(h=Qlim,col='red')
-        abline(v=Tlim2,lty=2,col='red')
-        abline(h=Qlim2,lty=2,col='red')
-        abline(v=Tlim3,lty=3,col='red')
-        abline(h=Qlim3,lty=3,col='red')
-        if(is.null(lbd))points(TN,QN,col='red')
-        if(!is.null(lbd))text(TN,QN,as.character(lbd),col='red',cex=0.6)
-      }
-      
-      t2qext<-cbind.data.frame(TN,QN)
-      colnames(t2qext)<-c('T^2','Q')
-      t2qext_tbl<-cbind(c(1:length(TN)),t2qext)
-      colnames(t2qext_tbl)[1]<-' '
-      # write.table(t2qext_tbl,'t2qext.txt',sep="\t",row.names=FALSE,col.names=TRUE)
-      return(t2qext)}
-    
-
-    if(sum(PCA$res@missing)>0){
-      mess<-paste('Not possible to compute Q diagnostics with', sum(PCA$res@missing),'missing data')
-      sendSweetAlert(session, title = "Input Error",
-                     text = mess,
-                     type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
-    }else{
-      if(PCA$type=='pca'){
-        M_<-dati_ext$DS[,!colnames(dati_ext$DS)%in%input$pca_ext_data_varsup]
-        if(sum(is.na(M_))!=0){
-          sendSweetAlert(session, title = "Input Error",
-                         text = '>>NA found: remove them before evaluation<<',
-                         type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
-        }else{
-          lbd<-NULL
-          # if(as.logical(input$pca_dia_ext_t2andq_rnames)) lbd<-rownames(M_)
-          if(as.logical(input$pca_dia_ext_t2andq_rnumbers)) lbd<-1:nrow(M_)
-          if(!is.null(input$pca_ext_data_t2q_lab))lbd <- dati_ext$DS[,input$pca_ext_data_t2q_lab]
-          
-          req(input$pca_ext2q_compN)
-          t2qext<-pcanewdia(PCA,PCA$res@nObs,PCA$res@nVar,as.numeric(input$pca_ext2q_compN),M_,lbd)
-          PCA_ext$T2 <- t2qext$'T^2'
-          PCA_ext$Q <- t2qext$Q
-        }
-      }else{
-        sendSweetAlert(session, title = "Input Error",
-                       text = 'Function not allowed with Varimax!',
-                       type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
-      }
-      }
-      })
-
-  output$pca_dia_ext_t2andq_dwl <- downloadHandler(
-    filename = "t2qext.xlsx",
-    content = function(file) {
-      df <- cbind.data.frame(t2=PCA_ext$T2,q=PCA_ext$Q)
-      df <- as.data.frame(df)
-      df<-cbind.data.frame(' '=rownames(df),df)
-      write.xlsx(df, file,colNames=TRUE)
-    })
-  
-  # PCA - ext diagnostic: T2 contribution -----------------------------------------------
-
-  output$pca_dia_ext_t2contr_compN <- renderUI({
-    req(!is.null(PCA$res))
-    selectInput("pca_dia_ext_t2contr_compN", label = "Number of components",
-                choices = 1:PCA$res@nPcs,
-                selected = 2)
-  })
-
-  output$pca_dia_ext_t2contr_nr <- renderUI({
-    req(!is.null(PCA_ext$scores))
-    selectInput("pca_dia_ext_t2contr_nr", label = "Row number",
-                choices = 1:nrow(PCA_ext$scores),
-                selected = 1)
-  })
-  
-  output$pca_dia_ext_t2contr_pl <- renderPlot({
-    req(!is.null(PCA$res))
-    req(!is.null(PCA_ext$scores))
-    
-    pcaconplot_testset<-function(X,i,PCA,ncp,lbl,nm){
-      # new dataset evaluation
-      nr<-nrow(X)
-      nc<-ncol(X)
-      name_r <- rownames(X)
-      unity<-matrix(rep(1,nr),nr,1)
-      if(PCA$center)X<-X-(unity%*%PCA$centered)
-      if(PCA$scale)X<-X/(unity%*%PCA$scaled)
-      X<-as.matrix(X)
-      P<-PCA$res@loadings[,1:ncp,drop=FALSE]
-      S<-X%*%P
-      Ls<-PCA$res@sDev[1:ncp]
-      sgl<-sum(Ls)
-      sgr<-PCA$sgt-sgl
-      MQ<-S%*%t(P)
-      
-      # MT<-P%*%(diag(1/Ls))%*%t(P)
-      if(ncp>1){
-        MT<-P%*%(diag(1/Ls))%*%t(P)
-      }else{
-        MT<-P%*%(diag(as.matrix(1/Ls)))%*%t(P)}
-      
-      T<-X%*%MT
-      Ti<-T[i,]
-      minT<-min(Ti)
-      maxT<-max(Ti)
-      if(minT>0){minT<-0}
-      if(maxT<0){maxT<-0}
-      Tlim<-c(minT,maxT)
-      
-      if(nm){
-        X<-as.matrix(PCA$res@completeObs)
-        S<-PCA$res@scores[,1:ncp]
-        MQ<-S%*%t(P)
-        T<-X%*%MT
-        Ti<-Ti/apply(abs(T),2,quantile,probs=0.95)
-        Tlim<-c(min(Ti,-1.1),max(Ti,1.1))
-      }
-      # dev.new(title="T^2 contribution plot external")
-      options(scipen=1)
-      barplot2(Ti,main=paste('T^2 of object',name_r),ylim=Tlim,cex.lab=1.2,names.arg=lbl,cex.names=0.6,plot.grid=TRUE,las=2,cex.axis=0.6)
-      box(which="plot",lty="solid")
-      if(nm)abline(h=1,col='red')
-      if(nm)abline(h=-1,col='red')
-      return(Ti)}
-
-    library(gplots)
-    if(PCA$type=='pca'){
-      req(input$pca_dia_ext_t2contr_compN)
-      req(input$pca_dia_ext_t2contr_nr)
-      
-      M_<-dati_ext$DS[as.numeric(input$pca_dia_ext_t2contr_nr),!colnames(dati_ext$DS)%in%input$pca_ext_data_varsup]
-      if(sum(is.na(M_))!=0){
-        sendSweetAlert(session, title = "Input Error",
-                       text = '>>NA found: remove them before evaluation<<',
-                       type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
-      }else{
-        lbl<-names(as.data.frame(PCA$dataset))
-        ncp<-as.numeric(input$pca_dia_ext_t2contr_compN)
-        nm<-input$pca_dia_ext_t2contr_norm
-        nc<-PCA$res@nVar
-        if(ncp<=nc){
-          if(nrow(M_)==1){
-            PCA$c_T2 <- pcaconplot_testset(M_,1,PCA,ncp,lbl,nm)
-          }else{
-            sendSweetAlert(session, title = "Input Error",
-                           text = 'You must choose just one row!',
-                           type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
-          }
-        }else{
-          sendSweetAlert(session, title = "Input Error",
-                         text = 'Number of component greater than number of variables!',
-                         type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
-        }
-      }
-      
-    }else{
-      sendSweetAlert(session, title = "Input Error",
-                     text = 'Function not allowed with Varimax!',
-                     type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
-    }
-  })
-  
-  output$pca_dia_ext_t2contr_dwl <- downloadHandler(
-    filename = "ext_t2contr.xlsx",
-    content = function(file) {
-      df <- cbind.data.frame(PCA$c_T2)
-      df <- as.data.frame(df)
-      colnames(df) <- 'T2'
-      df<-cbind.data.frame(' '=rownames(df),df)
-      write.xlsx(df, file,colNames=TRUE)
-    })
-
-  # PCA - ext diagnostic: Q contribution -----------------------------------------------
-  
-  output$pca_dia_ext_qcontr_compN <- renderUI({
-    req(!is.null(PCA$res))
-    selectInput("pca_dia_ext_qcontr_compN", label = "Number of components",
-                choices = 1:PCA$res@nPcs,
-                selected = 2)
-  })
-  
-  output$pca_dia_ext_qcontr_nr <- renderUI({
-    req(!is.null(PCA_ext$scores))
-    selectInput("pca_dia_ext_qcontr_nr", label = "Row number",
-                choices = 1:nrow(PCA_ext$scores),
-                selected = 1)
-  })
-  
-  output$pca_dia_ext_qcontr_pl <- renderPlot({
-    req(!is.null(PCA$res))
-    req(!is.null(PCA_ext$scores))
-
-    pcaconplot_testset<-function(X,i,PCA,ncp,lbl,nm){
-      # new dataset evaluation
-      nr<-nrow(X)
-      nc<-ncol(X)
-      name_r <- rownames(X)
-      unity<-matrix(rep(1,nr),nr,1)
-      if(PCA$center)X<-X-(unity%*%PCA$centered)
-      if(PCA$scale)X<-X/(unity%*%PCA$scaled)
-      X<-as.matrix(X)
-      P<-PCA$res@loadings[,1:ncp,drop=FALSE]
-      S<-X%*%P
-      Ls<-PCA$res@sDev[1:ncp]
-      sgl<-sum(Ls)
-      sgr<-PCA$sgt-sgl
-      MQ<-S%*%t(P)
-      
-      # MT<-P%*%(diag(1/Ls))%*%t(P)
-      if(ncp>1){
-        MT<-P%*%(diag(1/Ls))%*%t(P)
-      }else{
-        MT<-P%*%(diag(as.matrix(1/Ls)))%*%t(P)}
-      
-      Q<-sign(X-MQ)*(X-MQ)^2
-      Qi<-Q[i,]
-      minQ<-min(Qi)
-      maxQ<-max(Qi)
-      if(minQ>0){minQ<-0}
-      if(maxQ<0){maxQ<-0}
-      Qlim<-c(minQ,maxQ)
-      if(nm){
-        X<-as.matrix(PCA$res@completeObs)
-        S<-PCA$res@scores[,1:ncp]
-        MQ<-S%*%t(P)
-        Q<-sign(X-MQ)*(X-MQ)^2
-        Qi<-Qi/apply(abs(Q),2,quantile,probs=0.95)
-        Qlim<-c(min(Qi,-1.1),max(Qi,1.1))
-      }
-      # dev.new(title="Q contribution plot external")
-      options(scipen=1)
-      barplot2(Qi,main=paste('Q of object',name_r),ylim=Qlim,cex.lab=1.2,names.arg=lbl,cex.names=0.6,plot.grid=TRUE,las=2,cex.axis=0.6)
-      box(which="plot",lty="solid")
-      if(nm)abline(h=1,col='red')
-      if(nm)abline(h=-1,col='red')
-      return(Qi)}
-    
-    library(gplots)
-
-    if(sum(PCA$res@missing)>0){
-      mess<-paste('Not possible to compute Q diagnostics with', sum(PCA$res@missing),'missing data')
-      sendSweetAlert(session, title = "Input Error",
-                     text = mess,
-                     type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
-    }else{
-      if(PCA$type=='pca'){
-        req(input$pca_dia_ext_qcontr_compN)
-        req(input$pca_dia_ext_qcontr_nr)
-  
-        M_<-dati_ext$DS[as.numeric(input$pca_dia_ext_qcontr_nr),!colnames(dati_ext$DS)%in%input$pca_ext_data_varsup]
-        if(sum(is.na(M_))!=0){
-          sendSweetAlert(session, title = "Input Error",
-                         text = '>>NA found: remove them before evaluation<<',
-                         type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
-        }else{
-          lbl<-names(as.data.frame(PCA$dataset))
-          ncp<-as.numeric(input$pca_dia_ext_qcontr_compN)
-          nm<-input$pca_dia_ext_qcontr_norm 
-          nc<-PCA$res@nVar
-          if(ncp<=nc){
-            if(nrow(M_)==1){
-              PCA$c_Q <- pcaconplot_testset(M_,1,PCA,ncp,lbl,nm)
-            }else{
-              sendSweetAlert(session, title = "Input Error",
-                             text = 'You must choose just one row!',
-                             type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
-            }
-          }else{
-            sendSweetAlert(session, title = "Input Error",
-                           text = 'Number of component greater than number of variables!',
-                           type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)}
-        } 
-          }else{
-            sendSweetAlert(session, title = "Input Error",
-                           text = 'Function not allowed with Varimax!',
-                           type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)}
- 
-    }
-  })
-  
-  output$pca_dia_ext_qcontr_dwl <- downloadHandler(
-    filename = "ext_qcontr.xlsx",
-    content = function(file) {
-      df <- cbind.data.frame(PCA$c_Q)
-      df <- as.data.frame(df)
-      colnames(df) <- 'Q'
-      df<-cbind.data.frame(' '=rownames(df),df)
-      write.xlsx(df, file,colNames=TRUE)
-    })
-
 
 }
   
