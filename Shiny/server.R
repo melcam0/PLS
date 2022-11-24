@@ -217,7 +217,8 @@ server <- function (input , output, session ){
       dati$righe_rest<-row.names(df)
       dati$var<-colnames(df)
       dati$var_nr<-colnames(df)
-      dati$var_qt<-colnames(df)},
+      dati$var_qt<-colnames(df)
+      dati$var_qt_tr<-colnames(df)},
       error = function(e) {
         stop(safeError(e))
       }
@@ -230,6 +231,7 @@ server <- function (input , output, session ){
       dati$var=NULL
       dati$var_nr=NULL
       dati$var_qt=NULL
+      dati$var_qt_tr=NULL
       dati$var_ql=NULL
       dati$righe=NULL
       dati$righe_rest=NULL
@@ -289,7 +291,8 @@ server <- function (input , output, session ){
       dati$righe_rest<-row.names(df)
       dati$var<-colnames(df)
       dati$var_nr<-colnames(df)
-      dati$var_qt<-colnames(df)},
+      dati$var_qt<-colnames(df)
+      dati$var_qt_tr<-colnames(df)},
       error = function(e) {
         stop(safeError(e))
       }
@@ -319,6 +322,7 @@ server <- function (input , output, session ){
       dati$var<-colnames(df)
       dati$var_nr<-colnames(df)
       dati$var_qt<-colnames(df)
+      dati$var_qt_tr<-colnames(df)
     })
   
   output$contents_incolla <- renderTable({
@@ -492,9 +496,15 @@ server <- function (input , output, session ){
     req(!is.null(dati$DS))
       M_<-dati$DS[,dati$var_qt]
       if(!is.null(input$var_y))M_ <- M_[,colnames(M_)!=input$var_y]
+      at=c(seq(1,length(colnames(M_)),(length(colnames(M_))-1)/4),length(colnames(M_)))
+      assex <- 1:length(colnames(M_))
+      if(input$profile_chk){
+        assex <- colnames(M_)
+      }
       if(is.numeric(t(M_))){
         if(is.null(input$profile_col)){
-          matplot(y = t(M_),type = "l",lty=1,xlab="",ylab="")
+          matplot(y = t(M_),type = "l",lty=1,xlab="",ylab="",xaxt='n')
+          axis(side=1, at=at,labels=assex[at])
         }else{
           req(!is.null(input$profile_col))
           grade<-dati$DS_tr[,input$profile_col]
@@ -509,12 +519,14 @@ server <- function (input , output, session ){
             if(tog=="character")vcolor<-unlist(dovc(as.character(lev)))
             if(tog=="integer")vcolor<-unlist(dovc(as.numeric(lev)))
             if(tog=="character" | tog=="factor"){
-              matplot(y = t(M_),type = "l",lty=1,xlab="",ylab="",col=vcolor[grade])
+              matplot(y = t(M_),type = "l",lty=1,xlab="",ylab="",col=vcolor[grade],xaxt='n')
+              axis(side=1, at=at,labels=assex[at])
               legend("top", legend=lev,col=vcolor, cex=0.8,lty=1,ncol=min(length(lev),4),inset=c(0,-0.10),xpd=TRUE,bty = "n")
             }else{
               layout(mat=matrix(c(1,2),nrow=1),widths = c(8,0.9))
               par(mar = c(4, 3, 4, 0))
-              matplot(y = t(M_),type = "l",lty=1,xlab="",ylab="",col=vcolor[grade])
+              matplot(y = t(M_),type = "l",lty=1,xlab="",ylab="",col=vcolor[grade],xaxt='n')
+              axis(side=1, at=at,labels=assex[at])
               par(mar = c(2, 2, 4, 2))
               m<-as.numeric(lev)[order(as.numeric(lev),decreasing = FALSE)]
               tl <- input$input$profile_col
@@ -583,6 +595,7 @@ server <- function (input , output, session ){
   
   observeEvent(input$profile_reset,{
     dati$DS <- dati$DS_tr
+    dati$var_qt <- dati$var_qt_tr
     trsf$testo=NULL
     reset('profile_transf')
   })
@@ -744,8 +757,10 @@ server <- function (input , output, session ){
   
   output$plsmodel_out_df <- renderPrint({
     req(!is.null(PLS$res))
-    cat(paste('Model created with ',format(as.numeric(input$pls_n_comp_df),digits=2),
-              ' components',sep=''))
+    # cat(paste('Model created with ',format(as.numeric(input$pls_n_comp_df),digits=2),
+    #           ' components',sep=''))
+    cat('Model created with ','\n')
+    cat(paste(format(as.numeric(input$pls_n_comp_df),digits=2),' components',sep=''))
   })
   
   output$pls_cv_plot<-renderPlot({
@@ -1364,8 +1379,6 @@ server <- function (input , output, session ){
     validate(need(!is.null(dati_ext$DS),"No data set!"))
     cat('Dimension loaded data set:',"\n")
     cat(dim(dati_ext$DS))
-    
-    # str(PLS$res)
   })
 
   output$pls_pred_data_var_y<-renderUI({
@@ -1378,10 +1391,6 @@ server <- function (input , output, session ){
                    ))
   })
     
-  
-  
-  
-  
   observeEvent(input$bplsext,{
     if(is.null(PLS$res)){
       sendSweetAlert(session, title = "Input Error",
@@ -1393,57 +1402,31 @@ server <- function (input , output, session ){
                        text = 'Load data set to be predicted!',
                        type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
       }else{
-        
-        
-        
         M_<-dati_ext$DS
         M_<-data.frame(M_)
-        # colnames(M_) <- colnames(dati_ext$DS)
         if(input$pls_pred_y_chk){
-          # M_ <- dati_ext$DS[,colnames(dati_ext$DS)!=input$pls_pred_data_var_y]
-          # colnames(M_) <- colnames(dati_ext$DS[,colnames(dati_ext$DS)!=input$pls_pred_data_var_y])
-
           Y_ <- dati_ext$DS[,input$pls_pred_data_var_y]
-
-
         }else{
-
           Y_<-rep(0,nrow(M_))
-
         }
-
         ncomp <- as.numeric(input$pls_n_comp_df)
-        
-      
         prm<-drop(predict(PLS$res,newdata=M_,ncomp=1:ncomp,scale=PLS$scale))
         PLS_ext$prm <- prm
         prm.tr<-drop(predict(PLS$res,newdata=NULL,ncomp=1:ncomp,scale=PLS$scale))
         PLS_ext$prm.tr <- prm.tr
-        
-
-        
         if(input$pls_pred_y_chk){
           rmsep<-RMSEP(PLS$res,ncomp=ncomp,scale=PLS$scale,
                        intercept=FALSE)$val[1,,]
           PLS_ext$rmsep <- rmsep
-          
         }
-  
-        
         if(nrow(M_)==1){
           prm<-matrix(unlist(prm),1,ncomp)
           PLS_ext$prm <- prm
-
         }
- 
         res<-prm[,ncomp]-Y_
         PLS_ext$res <- res
-
         res.tr<-prm.tr[,ncomp]-PLS$dataset[,1]
         PLS_ext$res.tr <- res.tr
-        
-
-        
       }
       }
   })
@@ -1510,269 +1493,11 @@ server <- function (input , output, session ){
     }
     par(op)
   })
-  
-  
-  
-  
-  
-  
-  
-  
-  
+
   output$pls_coeff_dwl <- downloadHandler(
     filename = "coeff.xlsx",
     content = function(file) {
-      # if (is.null(PLS$res$scale))Cm<-PLS$res$coefficients[,1,]
-      # if (!is.null(PLS$res$scale))Cm<-PLS$res$coefficients[,1,]/PLS$res$scale
       df <- PLS_ext$prm[,input$pls_n_comp_df]
-      write.xlsx(df, file,colNames=TRUE)
-    })
-  
-
-
-
-
-
-
-
-
-
-
-
-  # PCA - ext data projection -----------------------------------------------
-  
-
-  output$pca_ext_data_varnames <- renderUI({
-    req(!is.null(dati_ext$DS_nr))
-    pickerInput("pca_ext_data_varnames", label = "Rows Names variable",
-                choices = colnames(dati_ext$DS_nr),
-                options =  list(
-                  "max-options" = 1,
-                  "max-options-text" = "No more!"
-                ),
-                multiple = TRUE)
-  })
-
-  observeEvent(input$pca_ext_data_varnames,{
-    req(!is.null(dati_ext$DS))
-    dati_ext$nr <- dati_ext$DS[,colnames(dati_ext$DS)%in%input$pca_ext_data_varnames]
-    dati_ext$DS <- dati_ext$DS[,!colnames(dati_ext$DS)%in%input$pca_ext_data_varnames]
-    row.names(dati_ext$DS) <- dati_ext$nr
-  })
- 
-  output$pca_ext_data_varsup <- renderUI({
-    req(!is.null(dati_ext$DS))
-    pickerInput("pca_ext_data_varsup", label = "Sup. variables",
-                # choices = colnames(dati_ext$DS),
-                choices = colnames(dati_ext$DS[,!colnames(dati_ext$DS)%in%input$pca_ext_data_varnames]),
-                multiple = TRUE)
-  })
-  
-  output$pca_ext_data_rwnames <- renderUI({
-    req(!is.null(dati_ext$DS))
-    req(!is.null(input$pca_ext_data_varsup))
-    pickerInput("pca_ext_data_rwnames", label = "Label variable",
-                choices = input$pca_ext_data_varsup,
-                options =  list(
-                  "max-options" = 1,
-                  "max-options-text" = "No more!"
-                ),
-                multiple = TRUE)
-  })
-  
-  output$pca_ext_data_compx <- renderUI({
-    req(!is.null(PCA$res))
-    selectInput("pca_ext_data_compx", label = "Component on x-axis",
-                choices = 1:PCA$res@nPcs,
-                selected = 1)
-  })
-  
-  output$pca_ext_data_compy <- renderUI({
-    req(!is.null(PCA$res))
-    selectInput("pca_ext_data_compy", label = "Component on y-axis",
-                choices = 1:PCA$res@nPcs,
-                selected = 2)
-  })
-  
-  output$pca_ext_data_ell <- renderUI({
-    req(!is.null(PCA$res))
-    checkboxInput("pca_ext_data_ell", label = "Ellipses", value = FALSE)
-  })
-  
-  output$pca_ext_data_rnames_tr <- renderUI({
-    req(!is.null(PCA$res))
-    checkboxInput("pca_ext_data_rnames_tr", label = "Row names training set", value = FALSE)
-  })
-  
-  output$pca_ext_data_rnames <- renderUI({
-    req(!is.null(PCA$res))
-    checkboxInput("pca_ext_data_rnames", label = "Row names", value = FALSE)
-  })
-  
-  observeEvent(input$bpcaext,{
-    req(!is.null(dati_ext$DS))
-    
-    if(!is.null(PCA$res)){
-      M_<-dati_ext$DS[,!colnames(dati_ext$DS)%in%input$pca_ext_data_varsup]
-      if(sum(is.na(M_))!=0){
-        sendSweetAlert(session, title = "Input Error",
-                       text = 'NA found: remove them before evaluation!',
-                       type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
-      }else{
-        if(sum(apply(dati_ext$DS[,!colnames(dati_ext$DS)%in%input$pca_ext_data_varsup],2,'is.numeric'))!=
-           ncol(dati_ext$DS[,!colnames(dati_ext$DS)%in%input$pca_ext_data_varsup])){
-          sendSweetAlert(session, title = "Input Error",
-                         text = 'Le variabili qualitative devono essere selezionate come supplementari!',
-                         type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
-        }else{
-          T_<-PCA$res@loadings
-          unity<-matrix(rep(1,nrow(M_)),nrow(M_),1)
-          if(PCA$center)M_<-M_-(unity%*%PCA$centered)
-          if(PCA$scale)M_<-M_/(unity%*%PCA$scaled)
-          D_<-tryCatch(as.matrix(M_) %*% T_,
-                       error = function(e) "errore")
-          if(D_=='errore'){
-            sendSweetAlert(session, title = "Input Error",
-                           text = 'Controllare il numero di variabili!',
-                           type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
-          }else{
-            PCA_ext$scores <- D_
-          }
-        }
-      }
-    }else{
-      sendSweetAlert(session, title = "Input Error",
-                     text = 'Run PCA Model First!',
-                     type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
-    }
-  })
-  
-  output$pca_ext_data_pl <- renderPlot({
-    req(!is.null(PCA_ext$scores))
-    
-    ans <- list()
-    # ans[[1]] <- dati_ext$DS[,!colnames(dati_ext$DS)%in%input$pca_ext_data_varsup]
-    ans[[2]] <- 'all'
-    ans[[3]] <- 'all'
-    # ans[[4]] <- 'None'
-    ans[[5]] <- as.numeric(input$pca_ext_data_compx)
-    ans[[6]] <- as.numeric(input$pca_ext_data_compy)
-    ans[[7]] <- input$pca_ext_data_rnames_tr
-
-    ans[[8]] <- input$pca_ext_data_rnames
-    # ans[[8]] <- FALSE
-    # if(!is.null(input$pca_ext_data_rwnames))ans[[8]] <- TRUE
-
-    ans[[9]] <- input$pca_ext_data_ell
-    
-    c1_<-as.integer(ans[[5]])
-    c2_<-as.integer(ans[[6]])
-    
-    lb_<-NULL
-    if(as.logical(ans[[7]]))lb_<-row.names(PCA$dataset)
-    
-    lbd<-NULL
-    # if(input$pca_ext_data_rnames)lbd <- row.names(dati_ext$DS)
-    if(!is.null(input$pca_ext_data_rwnames))lbd<-dati_ext$DS[,input$pca_ext_data_rwnames]
-    if(as.logical(ans[[8]]))lbd<-dati_ext$nr
-    
-    S_<-PCA$res@scores
-    v1_<-PCA$res@R2[c1_]*100
-    v2_<-PCA$res@R2[c2_]*100
-    r<-nrow(S_)
-    c<-nrow(PCA$res@loadings)
-    if(!PCA$scale)c <- sum(apply(PCA$dataset,2,'var'))
-    
-    yn.lb<-TRUE
-    if(is.null(lb_))yn.lb<-FALSE
-    if(yn.lb){
-      if(length(lb_)!=nrow(S_)){
-        sendSweetAlert(session, title = "Input Error",
-                       text = 'Wrong Score Label Dimension!',
-                       type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
-      }
-    }
-    # new dataset evaluation
-    
-    D_<-PCA_ext$scores
-    
-    # plot standard score plot in the new scale 
-    Slim<-c(min(S_[,c(c1_,c2_)],D_[,c(c1_,c2_)]),max(S_[,c(c1_,c2_)],D_[,c(c1_,c2_)]))
-    if(PCA$type=='pca'){
-      xl_<-paste('Component ',as.character(c1_),' (',as.character(round(v1_,1)),'% of variance)',sep='')
-      yl_<-paste('Component ',as.character(c2_),' (',as.character(round(v2_,1)),'% of variance)',sep='')
-    }else{
-      xl_<-paste('Factor ',as.character(c1_),' (',as.character(round(v1_,1)),'% of variance)',sep='')
-      yl_<-paste('Factor ',as.character(c2_),' (',as.character(round(v2_,1)),'% of variance)',sep='')
-    }
-    tl_=paste('Score Plot (',as.character(round((v1_+v2_),1)),'% of total variance)',sep='')
-    
-    op<-par(pty='s')
-    if(!yn.lb){
-      plot(S_[,c(c1_,c2_)],xlim=Slim,ylim=Slim,pty='o',xlab=xl_,ylab=yl_,col='gray')}
-    if(yn.lb){
-      plot(S_[,c(c1_,c2_)],xlim=Slim,ylim=Slim,xlab=xl_,ylab=yl_,type='n')
-      text(S_[,c(c1_,c2_)],as.character(lb_),col='gray',cex=0.6)
-    }
-    grid()
-    text(0,0,'+',cex=1.2,col='red')
-    par(new=TRUE)
-    
-    if(as.logical(ans[[9]])){
-      title(main=tl_,sub='Training: black - External: red - Ellipses: critical T^2 value at p=0.05, 0.01 and 0.001',cex.main=1.2,font.main=2,
-            col.main="black",cex.sub=0.6,font.sub=2,col.sub="red")
-      
-      op<-par(pty='s')
-      par(new=TRUE)
-      
-      rad1=sqrt((v1_/100*((r-1)/r)*c)*qf(.95,2,r-2)*2*(r^2-1)/(r*(r-2))); 
-      rad2=sqrt((v2_/100*((r-1)/r)*c)*qf(.95,2,r-2)*2*(r^2-1)/(r*(r-2)));
-      theta <- seq(0, 2 * pi, length=1000)
-      x <- rad1 * cos(theta)
-      y <- rad2 * sin(theta)
-      plot(x, y, type = "l",col='gray',xlim=Slim,ylim=Slim,xlab='',ylab='')
-      par(new=TRUE)
-      rad1=sqrt((v1_/100*((r-1)/r)*c)*qf(.99,2,r-2)*2*(r^2-1)/(r*(r-2))); 
-      rad2=sqrt((v2_/100*((r-1)/r)*c)*qf(.99,2,r-2)*2*(r^2-1)/(r*(r-2)));
-      theta <- seq(0, 2 * pi, length=1000)
-      x <- rad1 * cos(theta)
-      y <- rad2 * sin(theta)
-      plot(x, y, type = "l",col='gray',xlim=Slim,ylim=Slim,xlab='',ylab='',lty=2)
-      par(new=TRUE)
-      rad1=sqrt((v1_/100*((r-1)/r)*c)*qf(.999,2,r-2)*2*(r^2-1)/(r*(r-2))); 
-      rad2=sqrt((v2_/100*((r-1)/r)*c)*qf(.999,2,r-2)*2*(r^2-1)/(r*(r-2)));
-      theta <- seq(0, 2 * pi, length=1000)
-      x <- rad1 * cos(theta)
-      y <- rad2 * sin(theta)
-      plot(x, y, type = "l",col='gray',xlim=Slim,ylim=Slim,xlab='',ylab='',lty=3)
-      par(new=TRUE)
-      
-    }else{
-      title(main=tl_,sub='Training: black - External: red',cex.main=1.2,font.main=2,
-            col.main="black",cex.sub=0.6,font.sub=2,col.sub="red")
-    }
-    # new dataset plot
-    ynld<-TRUE
-    nd<-nrow(D_)
-    if(is.null(lbd))ynld<-FALSE 
-    if(ynld){
-      if(length(lbd)!=nd){
-        sendSweetAlert(session, title = "Input Error",
-                       text = 'Wrong Dataset Label Dimension !',
-                       type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
-      }
-    }
-    if(!ynld)points(D_[,c1_],D_[,c2_],col='red')
-    if(ynld){points(D_[,c1_],D_[,c2_],type='n')
-      text(D_[,c1_],D_[,c2_],as.character(lbd),col='red',cex=0.7)}
-    par(op)
-  })
-  
-  output$pca_ext_data_dwl <- downloadHandler(
-    filename = "ext_scores.xlsx",
-    content = function(file) {
-      df <- as.data.frame(PCA_ext$scores)
-      df<-cbind.data.frame(' '=rownames(df),df)
       write.xlsx(df, file,colNames=TRUE)
     })
   
