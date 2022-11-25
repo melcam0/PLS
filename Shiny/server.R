@@ -607,7 +607,252 @@ server <- function (input , output, session ){
     })
  
 
-# PLS ---------------------------------------------------------------------
+# PCR/PLS ---------------------------------------------------------------------
+
+  # PCR - costruzione modello -------------------------------------------------
+  
+  output$pcr_n_comp<-renderUI({
+    req(dati$var_qt)
+    n <- length(dati$var_qt)-length(input$var_y)
+    selectInput("pcr_n_comp", label = "Max. number of components", 
+                choices = c(2:n), 
+                selected = 10)
+  })
+  
+  output$pcr_n_cv<-renderUI({
+    req(!is.null(dati$DS))
+    selectInput("pcr_n_cv", label = "Number of segments for CV", 
+                choices = c(2:nrow(dati$DS)), 
+                selected = 5)
+  })
+  
+  output$pcr_n_rnd<-renderUI({
+    req(!is.null(dati$DS))
+    req(input$pcr_cv_choise=="2")
+    numericInput("pcr_n_rnd", label = "Number of randomizations",value = 100,min = 1,max = 10000)
+  })
+  
+  observeEvent(input$bpcrmodel,{
+    validate(need(nrow(dati$DS)!=0,""))
+    if(is.null(input$var_y)){
+      sendSweetAlert(session, title = "Input Error",
+                     text = 'Select responce variable!',
+                     type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
+    }else{
+      M_<-dati$DS[,dati$var_qt]
+      if(!is.null(input$var_y))M_ <- M_[,colnames(M_)!=input$var_y]
+      Y_ <- dati$DS[,input$var_y]
+      if((typeof(M_)=='double')|(typeof(M_)=='list')){
+        M_<-data.frame(cbind(Y_,data.frame(M_)))
+        naM<-names(M_)
+        nNA<-sum(is.na(M_))
+        nY<-1
+        if(nNA>0){
+          mess<-paste(as.character(nNA),'NA present.We try to rebuild them!')
+          showNotification(mess)
+          md<-prep(M_,scale="uv",center=TRUE,simple=FALSE,rev=FALSE)
+          res<-pca(md$data,method="nipals",nPcs=min(ncol(M_),10),scale="uv",center=TRUE)
+          M_<-prep(res@completeObs,scale=md$scale,center=md$center,reverse=TRUE)
+          M_<-as.data.frame(M_)
+        }
+        # M._<-M_  # ????
+        ncompo<-min(as.numeric(input$pcr_n_comp),ncol(M_)-1)
+        model<-paste(naM[nY],'~',(paste(naM[-nY],collapse='+')),sep='')
+        
+        
+        res<-pcr(as.formula(model),ncomp=ncompo,data=M_,segment.type="interleaved",
+                  validation='CV',segments=as.numeric(input$pcr_n_cv),scale=as.logical(input$pcr_scale))
+        resf<-pcr(as.formula(model),ncomp=ncompo,data=M_,validation='none',
+                   scale=as.logical(input$pcr_scale))
+        PLS$res <- res
+        PLS$resf <- resf
+        # PLS$ncompo <- ncompo
+        PLS$typ<-'PCR'
+        PLS$dataset<-M_
+        PLS$nY<-nY
+        PLS$validation<-'CV'
+        # PLS$nseg<-as.numeric(input$n_cv)
+        PLS$segtype<-'interleaved'
+        # PLS$scale<-as.logical(input$pcr_scale)
+        PLS$model<-as.formula(model)
+        if(input$pcr_cv_choise=="2"){
+          N<-c(NULL)
+          D<-data.frame(NULL)
+          withProgress(message = 'Reapeated CV:',value = 0, {
+            n <- as.numeric(input$pcr_n_rnd)
+            for(i in 1:n){
+              incProgress(detail = paste(i,"times"),amount = 1/n)
+              a=as.numeric(Sys.time())
+              set.seed(a)
+              M_=M_[sample(nrow(M_)),]
+              M_<-as.data.frame(M_)
+              res<-pcr(as.formula(model),ncomp=ncompo,data=M_,segment.type="interleaved",
+                        validation='CV',segments=as.numeric(input$pls_n_cv),scale=as.logical(input$pcr_scale))
+              # resf<-pcr(as.formula(model),ncomp=ncompo,data=M_,validation='none',
+              # scale=as.logical(ans[[7]]))
+              rmsep<-RMSEP(res,intercep=FALSE)
+              N[i]<-which.min(rmsep$val[1,,])
+              D<-rbind.data.frame(D,rmsep$val[1,,])
+            }
+          })
+          colnames(D)<-paste('Comp',c(1:ncompo))
+          D<-cbind.data.frame(N=N,D)
+          # D_min<-apply(D[,-1],2,min)
+          # D_max<-apply(D[,-1],2,max)
+          R_sq<-1-apply(D[,-1]^2,2,mean)*length(Y_)/sum((Y_ - mean(Y_))^2)
+          PLS$R_sq <- R_sq
+          PLS$D <- D
+        }
+      }else{
+        sendSweetAlert(session, title = "Input Error",
+                       text = 'Matrix/Table Requested!',
+                       type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
+      }
+    }
+  })
+  
+  output$model_pcr_out_1 <- renderPrint({
+    validate(need(nrow(dati$DS)!=0,"Load a dataset!"))
+    validate(need(!is.null(PLS$res),"Execute the model!"))
+    req(input$pcr_cv_choise=="1")
+    vm<-R2(PLS$res,estimate='CV',ncomp=1:input$pcr_n_comp,intercept=FALSE)$val[1,,]*100
+    rmsep<-RMSEP(PLS$res,intercep=FALSE)
+    cat(' ',"\n")
+    cat('CV% Explained Variance',"\n")
+    print(round(vm,2))
+    cat(' ',"\n")
+    cat('RMSECV',"\n")
+    print(round(rmsep$val[1,,],4))
+    cat(' ',"\n")
+    cat(paste('Minimum RMSECV at component n.',which.min(rmsep$val[1,,])),"\n")
+    
+  })
+  
+  output$model_pcr_out_2 <- renderPrint({
+    validate(need(nrow(dati$DS)!=0,"Load a dataset!"))
+    validate(need(!is.null(PLS$res),"Execute the model!"))
+    req(input$pcr_cv_choise=="2")
+    req(!is.null(PLS$D))
+    cat(' ',"\n")
+    cat('CV% Explained Variance',"\n")
+    print(round(PLS$R_sq*100,2),quote=FALSE)
+    #   print(round(vm,2))
+    cat(' ',"\n")
+    cat('Global RMSECV',"\n")
+    print(round(sqrt(apply(PLS$D^2,2,mean))[-1],4))
+    #   print(round(rmsep$val[1,,],4))
+    cat(' ',"\n")
+    cat(paste('Minimum Global RMSECV at component n.',which.min(sqrt(apply(PLS$D^2,2,mean))[-1])))
+    
+    
+  })
+  
+  output$pcr_n_comp_df<-renderUI({
+    req(!is.null(PLS$res))
+    rmsep<-RMSEP(PLS$res,intercep=FALSE)
+    selectInput("pcr_n_comp_df", label = "Number of components",
+                choices = c(2:length(dati$var_qt)),
+                selected = which.min(rmsep$val[1,,]))
+  })
+  
+  output$pcrmodel_out_df <- renderPrint({
+    req(!is.null(PLS$res))
+    # cat(paste('Model created with ',format(as.numeric(input$pcr_n_comp_df),digits=2),
+    #           ' components',sep=''))
+    cat(paste('Model', PLS$typ, 'created with '),'\n')
+    cat(paste(format(as.numeric(input$pcr_n_comp_df),digits=2),' components',sep=''))
+  })
+  
+  output$pcr_cv_plot<-renderPlot({
+    req(!is.null(PLS$res))
+    req(PLS$typ=='PCR')
+    if(input$pcr_cv_choise=="1"){
+      vm<-R2(PLS$res,estimate='CV',ncomp=1:as.numeric(input$pcr_n_comp),intercept=FALSE)$val[1,,]*100
+      rmsep<-RMSEP(PLS$res,intercep=FALSE)
+      op<-par(pty='s',mfrow=c(1,2))
+      plot(rmsep$val[1,,],xlab='Number of Components',ylab='RMSECV',main='');grid()
+      lines(rmsep$val[1,,])
+      vm<-R2(PLS$res,estimate='CV',ncomp=1:as.numeric(input$pcr_n_comp),intercept=FALSE)$val[1,,]*100
+      plot(vm,xlab='Number of Components',ylab='CV % Explained Variance',ylim=c(min(0,min(vm)),100));grid()#
+      lines(vm)
+      par(op)
+    }
+    if(input$pcr_cv_choise=="2"){
+      req(!is.null(PLS$D))
+      D_min<-apply(PLS$D[,-1],2,min)
+      D_max<-apply(PLS$D[,-1],2,max)
+      
+      
+      op<-par(pty='s',mfrow=c(2,2))
+      plot(sqrt(apply(PLS$D^2,2,mean))[-1],xlab='Number of Components',ylab='Global RMSECV',main='',
+           ylim = c(min(D_min),max(D_max)));grid()
+      lines(sqrt(apply(PLS$D^2,2,mean))[-1]) 
+      lines(D_min,col='red',lty = 2)
+      lines(D_max,col='red',lty = 2)
+      
+      plot(PLS$R_sq*100,xlab='Number of Components',ylab='CV % Explained Variance',
+           ylim=c(min(0,min(PLS$R_sq*100)),100));grid()
+      lines(PLS$R_sq*100)
+      
+      N <- PLS$D[,1]
+      N<-c(N,min(N):max(N))
+      F<-as.factor(N)
+      plot(F[1:as.numeric(input$pcr_n_rnd)],xlab='Number of Components',ylab='Frequency')
+      par(op)
+      
+    }
+  })
+  
+  # PCR - permutation -------------------------------------------------------
+  
+  observeEvent(input$bpcr_perm,{
+    validate(need(nrow(dati$DS)!=0,""))
+    req(PLS$res)
+    
+    Y_<-PLS$dataset[,1,drop=FALSE]
+    X_<-PLS$dataset[,-1,drop=FALSE]
+    D<-data.frame(NULL)
+    withProgress(message = 'computation progress bar:',value = 0, {
+      n <- as.numeric(input$pcr_n_prm) #da definire
+      for(k in 1:n){
+        incProgress(detail = sprintf("%d%% done", round(k/n*100)),amount = 1/n)
+        a=as.numeric(Sys.time())
+        set.seed(a)
+        Y_=Y_[sample(nrow(Y_)),,drop=FALSE]
+        X_=X_[sample(nrow(X_)),,drop=FALSE]
+        Data<-cbind.data.frame(Y_,X_)
+        res<-pcr(formula = PLS$model, ncomp = as.numeric(input$pls_n_comp_df), data = Data,
+                  scale = PLS$scale, validation = "CV", segment.type = "interleaved",segments = as.numeric(input$pls_n_cv))
+        rmsep<-RMSEP(res,intercep=FALSE)
+        D<-rbind.data.frame(D,rmsep$val[1,,as.numeric(input$pcr_n_comp_df)])
+      }
+    })
+    colnames(D)<-'RMSECV'
+    PLS$D_perm <- D
+    
+  })
+  
+  output$pcr_perm_plot <- renderPlot({
+    req(PLS$D_perm)
+    rmsep<-RMSEP(PLS$res,intercep=FALSE)
+    RMSEP <- rmsep$val[1,,as.numeric(input$pcr_n_comp_df)]
+    
+    
+    plot(main='Distribution density',xlab='RMSECV',density(PLS$D_perm[,1]),xlim=c(min(RMSEP,PLS$D_perm[,1]),max(RMSEP,PLS$D_perm[,1])))
+    abline(v=RMSEP, col="blue")
+  })
+  
+  output$pcr_perm_txt <- renderPrint({
+    req(PLS$D_perm)
+    rmsep<-RMSEP(PLS$res,intercep=FALSE)
+    RMSEP <- rmsep$val[1,,as.numeric(input$pcr_n_comp_df)]
+    if(median(PLS$D_perm[,1])>=RMSEP){
+      cat(paste0(sum(PLS$D_perm[,1]<=RMSEP)/as.numeric(input$pcr_n_prm),'%'))
+    }else{
+      cat(paste0(sum(PLS$D_perm[,1]>=RMSEP)/as.numeric(input$pcr_n_prm),'%'))
+    }
+  })
+
 
 # PLS - costruzione modello -------------------------------------------------
 
@@ -667,7 +912,7 @@ server <- function (input , output, session ){
         PLS$res <- res
         PLS$resf <- resf
         # PLS$ncompo <- ncompo
-        PLS$typ<-'PLS1'
+        PLS$typ<-'PLS'
         PLS$dataset<-M_
         PLS$nY<-nY
         PLS$validation<-'CV'
@@ -759,12 +1004,13 @@ server <- function (input , output, session ){
     req(!is.null(PLS$res))
     # cat(paste('Model created with ',format(as.numeric(input$pls_n_comp_df),digits=2),
     #           ' components',sep=''))
-    cat('Model created with ','\n')
+    cat(paste('Model', PLS$typ, 'created with '),'\n')
     cat(paste(format(as.numeric(input$pls_n_comp_df),digits=2),' components',sep=''))
   })
   
   output$pls_cv_plot<-renderPlot({
     req(!is.null(PLS$res))
+    req(PLS$typ=='PLS')
     if(input$pls_cv_choise=="1"){
       vm<-R2(PLS$res,estimate='CV',ncomp=1:as.numeric(input$pls_n_comp),intercept=FALSE)$val[1,,]*100
       rmsep<-RMSEP(PLS$res,intercep=FALSE)
@@ -780,7 +1026,6 @@ server <- function (input , output, session ){
       req(!is.null(PLS$D))
       D_min<-apply(PLS$D[,-1],2,min)
       D_max<-apply(PLS$D[,-1],2,max)
-      
       
       op<-par(pty='s',mfrow=c(2,2))
       plot(sqrt(apply(PLS$D^2,2,mean))[-1],xlab='Number of Components',ylab='Global RMSECV',main='',

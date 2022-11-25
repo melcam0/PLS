@@ -182,7 +182,56 @@ body<-dashboardBody(
                                downloadButton("ds_tr_download"))
                         )), 
       
-# PLS -------------------------------------------------------------------    
+# PCR/PLS -------------------------------------------------------------------    
+
+# PCR - costruzione modello -----------------------------------------------------------
+
+tabItem(tabName = "pcr_CV",
+        fluidPage(titlePanel("Model computation"),
+                  column(12,
+                         radioButtons("pcr_cv_choise", label ="",inline=TRUE,
+                                      choices = list("single CV" = 1, "repeated CV" = 2),
+                                      selected = 1)),
+                  column(4,
+                         checkboxInput("pcr_scale", label = "Scale (centering by default)", value = TRUE)),
+                  column(4,
+                         uiOutput('pcr_n_comp')),
+                  column(4,
+                         uiOutput('pcr_n_cv')),
+                  column(12,
+                         actionButton("bpcrmodel", label = "Execute")),
+                  column(12,
+                         hr()),
+                  column(10,
+                         plotOutput('pcr_cv_plot',height = "600px"),
+                         br(),
+                         verbatimTextOutput('model_pcr_out_1'),
+                         verbatimTextOutput('model_pcr_out_2')),
+                  column(2,
+                         uiOutput('pcr_n_rnd'),
+                         br(),
+                         uiOutput('pcr_n_comp_df'),
+                         verbatimTextOutput('pcrmodel_out_df'))
+        )
+),
+
+# PCR - permutation -------------------------------------------------------
+
+tabItem(tabName = "pcr_permutation",
+        fluidPage(titlePanel("Permutation test"),
+                  column(12,
+                         numericInput("pcr_n_prm", label = "Number of permutations", value = 1000),
+                         actionButton("bpcr_perm", label = "Execute")),
+                  column(12,
+                         br()),
+                  column(10,
+                         # verbatimTextOutput('a'),
+                         plotOutput('pcr_perm_plot',height = "600px")),
+                  column(2,
+                         verbatimTextOutput('pcr_perm_txt'))
+
+        )
+),
 
 # PLS - costruzione modello -----------------------------------------------------------
 
@@ -273,11 +322,15 @@ tabItem(tabName = "scores",
                          radioButtons("pls_res_scale", label ="",inline=TRUE,
                                       choices = list("Same scale" = 1, "Different scale" = 2), 
                                       selected = 1)),
-                  column(10,
-                         plotOutput('pls_scores_plot',height = "600px"),
+                  column(2),
+                  column(6,
+                         hr(),
+                         plotOutput('pls_scores_plot',height = "600px",width = "600px"),
                          br(),
                          downloadButton("pls_score_dwl")),
-                  column(2,
+                  # column(1),
+                  column(4,
+                         hr(),
                          uiOutput('pls_score_compx'),
                          uiOutput('pls_score_compy'),
                          uiOutput('pls_score_label'),
@@ -313,10 +366,13 @@ tabItem(tabName = "load",
 
 tabItem(tabName = "biplot",
         fluidPage(titlePanel("Biplot"),
-                  column(10,
+                  column(2),
+                  column(6,
                          hr(),
                          plotOutput('biplot',height = "600px")),
-                  column(2,
+                  # column(2),
+                  column(4,
+                         hr(),
                          uiOutput('pls_biplot_compx'),
                          uiOutput('pls_biplot_compy'),
                          uiOutput('pls_biplot_arrows'))
