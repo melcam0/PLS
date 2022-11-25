@@ -303,6 +303,7 @@ tabItem(tabName = "load",
                          uiOutput('pls_load_compy'),
                          uiOutput('pls_load_rnames'),
                          uiOutput('pls_load_arrows'),
+                         uiOutput('pls_load_chk'),
                          uiOutput('pls_load_linecomp'),
                          uiOutput('pls_load_compN'),
                          uiOutput('pls_load_cnames'))
@@ -331,8 +332,10 @@ tabItem(tabName = "coeff",
                          br(),
                          downloadButton("pls_coeff_dwl")),
                   column(2,
+                         hr(),
+                         checkboxInput("pls_coeff_chk", label = "Header on the x axis?", value = TRUE),
+                         hr(),
                          uiOutput('pls_coeff_comp'))
-
         )),
 
 

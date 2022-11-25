@@ -1167,6 +1167,13 @@ server <- function (input , output, session ){
     checkboxInput("pls_load_arrows", label = "Arrows", value = FALSE)
   })
   
+  
+  output$pls_load_chk <- renderUI({
+    req(!is.null(PLS$res))
+    req(input$pls_radio_load_type=='line')
+    checkboxInput("pls_load_chk", label = "Header on the x axis?", value = TRUE)
+  })
+  
   output$pls_load_linecomp <- renderUI({
     req(!is.null(PLS$res))
     req(input$pls_radio_load_type=='line')
@@ -1186,6 +1193,7 @@ server <- function (input , output, session ){
     req(input$pls_radio_load_type=='bar')
     checkboxInput("pls_load_cnames", label = "Column names", value = FALSE)
   })
+  
   
   output$loading_pl <- renderPlot({
     # req(!is.null(PLS$res))
@@ -1219,14 +1227,24 @@ server <- function (input , output, session ){
         # req(length(as.numeric(unlist(str_split(input$pls_load_linecomp,','))))==2)
       T<-loadings(PLS$res)
       vi<-as.numeric(unlist(str_split(input$pls_load_linecomp,',')))
+      
+      M_<-dati$DS[,dati$var_qt]
+      if(!is.null(input$var_y))M_ <- M_[,colnames(M_)!=input$var_y]
+      at=c(seq(1,length(colnames(M_)),(length(colnames(M_))-1)/4),length(colnames(M_)))
+      assex <- 1:length(colnames(M_))
+      x_lab <- 'Variable Number'
+      if(input$pls_load_chk){
+        assex <- colnames(M_)
+        x_lab <- 'Variable Name'
+      }
       if(sum(is.na(vi))==0){
         ylim <- c(min(T[,vi]),max(T[,vi]))
         # ylim <- c(min(T),max(T))
         plot(T[,1],ylab='x-loading value',
-             xlab='Variable number',type='n',
+             xlab=x_lab,type='n',xaxt='n',
              # ylim=c(min(T),max(T))
-             ylim=ylim
-        )
+             ylim=ylim)
+        axis(side=1, at=at,labels=assex[at])
         grid()
         leg <- c(NULL);k=0
         for(i in vi){
@@ -1285,8 +1303,6 @@ server <- function (input , output, session ){
     textInput("pls_coeff_comp", label = "Number of latent (e.g.,1,3,5)", value = "1,2")
   })
 
-  
-  
   output$coeff_pl <- renderPlot({
     validate(need(!is.null(PLS$res),"Compute the model!"))
     # req(!is.null(PLS$res))
@@ -1295,11 +1311,21 @@ server <- function (input , output, session ){
     if (!is.null(PLS$res$scale))Cm<-PLS$res$coefficients[,1,]/PLS$res$scale
     vi<-as.numeric(unlist(str_split(input$pls_coeff_comp,',')))
     #print(Cm)
+    M_<-dati$DS[,dati$var_qt]
+    if(!is.null(input$var_y))M_ <- M_[,colnames(M_)!=input$var_y]
+    at=c(seq(1,length(colnames(M_)),(length(colnames(M_))-1)/4),length(colnames(M_)))
+    assex <- 1:length(colnames(M_))
+    x_lab <- 'Variable Number'
+    if(input$  pls_coeff_chk){
+      assex <- colnames(M_)
+      x_lab <- 'Variable Name'
+    }
     nCm<-length(Cm[,1])
     if(sum(is.na(vi))==0){
-      
-      plot(1:nCm,Cm[,1],xlab='Variable Number',ylab='Regression Coefficients',type='n',
-           ylim=c(min(Cm[,vi]),max(Cm[,vi])));grid()
+      plot(1:nCm,Cm[,1],xlab=x_lab,ylab='Regression Coefficients',type='n',xaxt='n',
+           ylim=c(min(Cm[,vi]),max(Cm[,vi])))
+      axis(side=1, at=at,labels=assex[at])
+      grid()
       for(i in vi)lines(Cm[,i],col=which(vi==i))
       legend("bottomleft",legend=as.character(vi),col=1:length(vi),lty=1)
       abline(0,0,lty=2)
