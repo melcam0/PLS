@@ -39,7 +39,7 @@ sidebar<- dashboardSidebar(
                          br(),
                          actionButton("quit", "Quit",onclick = "setTimeout(function(){window.close();},200);",
                                       style='padding:4px; font-size:80%'),
-                         HTML('<p><center><font color="cyan"><br> Version 1.0 </font></center>')
+                         HTML('<p><center><font color="cyan"><br> Version 1.1 </font></center>')
                 )
                         ))
 
@@ -174,6 +174,9 @@ body<-dashboardBody(
                                              "max-options-text" = "No more!"
                                            ),
                                            multiple = TRUE),
+                               uiOutput('profile_bin_1'),
+                               uiOutput('profile_bin_2'),
+                               uiOutput('profile_bin_3'),
                                actionButton("profile_reset","Reset",style='padding:4px; font-size:80%')
                                ),
                         column(12,

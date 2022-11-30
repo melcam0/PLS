@@ -491,12 +491,65 @@ server <- function (input , output, session ){
                 ),
                 multiple = TRUE)
   })
+  
+  output$profile_bin_1 <- renderUI({
+    req(input$profile_transf=='Binning')
+    req(!is.null(dati$var_qt))
+    var <- dati$var_qt[!dati$var_qt%in%input$var_y]
+    selectizeInput(inputId = "profile_bin_1"," ",
+                   choices = var,
+                   options = list(
+                     placeholder = 'Select first variable',
+                     onInitialize = I('function() { this.setValue(""); }')
+                   ))
+  })
+  
+  output$profile_bin_2 <- renderUI({
+    req(input$profile_transf=='Binning')
+    req(!is.null(dati$var_qt))
+    var <- dati$var_qt[!dati$var_qt%in%input$var_y]
+    selectizeInput(inputId = "profile_bin_2"," ",
+                   choices = var,
+                   options = list(
+                     placeholder = 'Select first variable',
+                     onInitialize = I('function() { this.setValue(""); }')
+                   ))
+  })
+  
+  output$profile_bin_3 <- renderUI({
+    req(input$profile_transf=='Binning')
+    req(!is.null(dati$DS))
+    cl_start<-which(colnames(dati$DS)==input$profile_bin_1)
+    cl_end<-which(colnames(dati$DS)==input$profile_bin_2)
+    req(!identical(cl_start, integer(0)))
+    req(!identical(cl_end, integer(0)))
+    
+    n<-cl_end-cl_start+1
+    x <- 1:n
+    x <- x[n%%x==0]
+    x <- x[-length(x)]
+    x <- x[-1]
+
+    selectizeInput(inputId = "profile_bin_3"," ",
+                   choices = x,
+                   options = list(
+                     placeholder = 'Bin width (divider of the number of selected columns)',
+                     onInitialize = I('function() { this.setValue(""); }')
+                   ))
+    
+  })
+  
+  prof_bin_3 <- reactiveValues(ampl=NULL)
+  observeEvent(input$profile_bin_3,{
+    prof_bin_3$ampl <- as.numeric(input$profile_bin_3)
+  })
 
   output$profile_plot <- renderPlot({
     req(!is.null(dati$DS))
       M_<-dati$DS[,dati$var_qt]
       if(!is.null(input$var_y))M_ <- M_[,colnames(M_)!=input$var_y]
-      at=c(seq(1,length(colnames(M_)),(length(colnames(M_))-1)/4),length(colnames(M_)))
+      at <- 1:length((colnames(M_)))
+      if(length((colnames(M_)))>5)at=c(seq(1,length(colnames(M_)),(length(colnames(M_))-1)/4),length(colnames(M_)))
       assex <- 1:length(colnames(M_))
       if(input$profile_chk){
         assex <- colnames(M_)
@@ -557,6 +610,49 @@ server <- function (input , output, session ){
       M<-t(M)
       dati$DS <- cbind.data.frame(M_s,M)
     }
+
+    if(input$profile_transf=='Binning'){
+      M <- dati$DS[,dati$var_qt]
+      M_s <- dati$DS[,!colnames(dati$DS)%in%dati$var_qt]
+      if(!is.null(input$var_y)){
+        M <- M[,colnames(M)!=input$var_y]
+        M_s <- cbind.data.frame(M_s,dati$DS[,input$var_y])
+        colnames(M_s)[length(colnames(M_s))] <- input$var_y
+      }
+
+
+
+      observeEvent(input$profile_bin_1,{
+        cl_start<-which(colnames(M)==input$profile_bin_1)
+        req(!identical(cl_start, integer(0)))
+        observeEvent(input$profile_bin_2,{
+          cl_end<-which(colnames(M)==input$profile_bin_2)
+          req(!identical(cl_end, integer(0)))
+          observeEvent(input$profile_bin_3,{
+            validate(need(!is.null(prof_bin_3$ampl),""))
+            req(!is.na(prof_bin_3$ampl))
+            req(!is.null(prof_bin_3$ampl))
+            ampl <-prof_bin_3$ampl
+            n<-cl_end-cl_start+1
+            q_<-n/ampl
+            X_<-as.data.frame(apply(M[,cl_start:(cl_start+ampl-1)],1,'mean'))
+            for (i in 2:q_){
+              Y_<-as.data.frame(apply(M[,(cl_start+ampl*(i-1)):(cl_start+ampl*i-1)],1,'mean'))
+              X_<-cbind.data.frame(X_,Y_)
+            }
+            colnames(X_)<-paste0('X',1:q_)
+            if(cl_start>1){
+              M_1<-M[,1:(cl_start-1),drop=FALSE]
+              X_<-cbind.data.frame(M_1,X_)}
+            if(cl_end<ncol(M)){
+              M_2<-M[,(cl_end+1):ncol(M),drop=FALSE]
+              X_<-cbind.data.frame(X_,M_2)}
+            dati$DS <- cbind.data.frame(M_s,X_)
+            dati$var_qt <- colnames(X_)
+          })
+        })
+      })
+    }
     if(input$profile_transf=='First Derivative'){
       M <- dati$DS[,dati$var_qt]
       M_s <- dati$DS[,!colnames(dati$DS)%in%dati$var_qt]
@@ -598,6 +694,8 @@ server <- function (input , output, session ){
     dati$var_qt <- dati$var_qt_tr
     trsf$testo=NULL
     reset('profile_transf')
+    prof_bin_3$ampl <- NULL
+
   })
   
   output$ds_tr_download <- downloadHandler(

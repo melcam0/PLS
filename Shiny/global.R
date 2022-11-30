@@ -8,6 +8,7 @@ library(readxl)
 library(openxlsx)
 library(pls)
 library(gplots)
+library(stringr)
 options(warn = -1)
 options(shiny.maxRequestSize = 30 * 1024 ^ 2)
 

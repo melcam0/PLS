@@ -12,7 +12,9 @@ pacchetti<-c('shiny',
              # 'stringr',
              # 'chemometrics',
              'pls',
-             'gplots')
+             'gplots',
+             'DT',
+             'stringr')
 
 install.packages(pkgs = pacchetti)
 
