@@ -1,7 +1,6 @@
 rm(list = ls())
 
-colorpanel <- function (n, low, mid, high) 
-{
+colorpanel <- function (n, low, mid, high) {
   if (missing(mid) || missing(high)) {
     low <- col2rgb(low)
     if (missing(high)) 
@@ -78,6 +77,73 @@ dovc<-function(d){
   }
   return(list(C))
 }
+
+convCppV<-function(u,v){
+  m=length(u);n=length(v)
+  p=m-n+1
+  w<-rep(0,p)
+  for(k in 1:p){
+    w[k]<-u[k]*v[1]
+    for(j in 2:n){
+      w[k]<-w[k]+u[k+j-1]*v[j]
+    }
+  }
+  return(w)
+}
+
+convCppM<-function(M,v){
+  n=nrow(M);m<-ncol(M);f<-length(v)
+  p=m-f+1
+  X<-matrix(rep(0,n*p),n,p)
+  for(i in 1:n){
+    u<-as.numeric(M[i,])
+    X[i,]<-convCppV(u,v)
+  }
+  return(X)
+}
+
+savitzkyGolay <- function(X, m, p, w, delta.wav) {
+  if (is.data.frame(X)) 
+    X <- as.matrix(X)
+  if (w%%2 != 1){
+    showNotification("needs an odd filter length w",type='error')
+  }else{
+    if (p >= w){
+      showNotification("filter length w should be greater than polynomial order p",type='error')
+    }else{
+      if (p < m){
+        showNotification("polynomial order p should be geater or equal to differentiation order m",type='error')
+      }else{
+        gap <- (w - 1)/2
+        basis <- outer(-gap:gap, 0:p, "^")
+        A <- solve(crossprod(basis, basis), tol = 0) %*% t(basis)
+        if (is.matrix(X)) {
+          if (w >= ncol(X)){
+            showNotification("filter length w should be lower than ncol(X)",type='error')
+          }else{
+            output <- factorial(m) * convCppM(X, A[m + 1, ])
+            g <- (w - 1)/2
+            colnames(output) <- colnames(X)[(g + 1):(ncol(X) - g)]
+            rownames(output) <- rownames(X)
+          } 
+        }
+        if (is.vector(X)) {
+          if (w >= length(X)){
+            showNotification("filter length w should be lower than length(X)",type='error')
+          }else{
+            output <- factorial(m) * convCppV(X, A[m + 1, ])
+            g <- (w - 1)/2
+            names(output) <- names(X)[(g + 1):(length(X) - g)]
+          }
+        }
+        # scaling
+        if (!missing(delta.wav)) 
+          output <- output/delta.wav^m
+        return(output)
+      }
+    }
+  }
+} 
 
 
 server <- function (input , output, session ){
@@ -511,7 +577,7 @@ server <- function (input , output, session ){
     selectizeInput(inputId = "profile_bin_2"," ",
                    choices = var,
                    options = list(
-                     placeholder = 'Select first variable',
+                     placeholder = 'Select last variable',
                      onInitialize = I('function() { this.setValue(""); }')
                    ))
   })
@@ -523,13 +589,11 @@ server <- function (input , output, session ){
     cl_end<-which(colnames(dati$DS)==input$profile_bin_2)
     req(!identical(cl_start, integer(0)))
     req(!identical(cl_end, integer(0)))
-    
     n<-cl_end-cl_start+1
     x <- 1:n
     x <- x[n%%x==0]
     x <- x[-length(x)]
     x <- x[-1]
-
     selectizeInput(inputId = "profile_bin_3"," ",
                    choices = x,
                    options = list(
@@ -543,6 +607,100 @@ server <- function (input , output, session ){
   observeEvent(input$profile_bin_3,{
     prof_bin_3$ampl <- as.numeric(input$profile_bin_3)
   })
+
+  output$profile_sg_1 <- renderUI({
+    req(input$profile_transf=='Savitzky-Golay')
+    req(!is.null(dati$var_qt))
+    var <- dati$var_qt[!dati$var_qt%in%input$var_y]
+    selectizeInput(inputId = "profile_sg_1"," ",
+                   choices = var,
+                   options = list(
+                     placeholder = 'Select first variable',
+                     onInitialize = I('function() { this.setValue(""); }')
+                   ))
+  })
+  
+  output$profile_sg_2 <- renderUI({
+    req(input$profile_transf=='Savitzky-Golay')
+    req(!is.null(dati$var_qt))
+    var <- dati$var_qt[!dati$var_qt%in%input$var_y]
+    selectizeInput(inputId = "profile_sg_2"," ",
+                   choices = var,
+                   options = list(
+                     placeholder = 'Select last variable',
+                     onInitialize = I('function() { this.setValue(""); }')
+                   ))
+  })
+  
+  output$profile_sg_3 <- renderUI({
+    req(input$profile_transf=='Savitzky-Golay')
+    cl_start<-which(colnames(dati$DS)==input$profile_sg_1)
+    cl_end<-which(colnames(dati$DS)==input$profile_sg_2)
+    req(!identical(cl_start, integer(0)))
+    req(!identical(cl_end, integer(0)))
+    x <- 1:100
+    selectizeInput(inputId = "profile_sg_3"," ",
+                   choices = x,
+                   options = list(
+                     placeholder = 'Derivative',
+                     onInitialize = I('function() { this.setValue(""); }')
+                   ))
+  })
+
+  output$profile_sg_4 <- renderUI({
+    req(input$profile_transf=='Savitzky-Golay')
+    cl_start<-which(colnames(dati$DS)==input$profile_sg_1)
+    cl_end<-which(colnames(dati$DS)==input$profile_sg_2)
+    req(!identical(cl_start, integer(0)))
+    req(!identical(cl_end, integer(0)))
+    req(input$profile_sg_3!="")
+    d <- as.numeric(input$profile_sg_3)
+    p <- 1:100
+    p <- p[p>=d]
+    selectizeInput(inputId = "profile_sg_4"," ",
+                   choices = p,
+                   options = list(
+                     placeholder = 'Polynomial',
+                     onInitialize = I('function() { this.setValue(""); }')
+                   ))
+  })
+  
+  output$profile_sg_5 <- renderUI({
+    req(input$profile_transf=='Savitzky-Golay')
+    cl_start<-which(colnames(dati$DS)==input$profile_sg_1)
+    cl_end<-which(colnames(dati$DS)==input$profile_sg_2)
+    req(!identical(cl_start, integer(0)))
+    req(!identical(cl_end, integer(0)))
+    req(input$profile_sg_3!="")
+    req(!is.null(input$profile_sg_4))
+    req(input$profile_sg_4!="")
+    p <- as.numeric(input$profile_sg_4)
+    n <- cl_end-cl_start
+    w <- seq(1,n,2)
+    w <- w[w>p] 
+    selectizeInput(inputId = "profile_sg_5"," ",
+                   choices = w,
+                   options = list(
+                     placeholder = 'Window size',
+                     onInitialize = I('function() { this.setValue(""); }')
+                   ))
+  })
+  
+  prof_sg <- reactiveValues(der=NULL,pol=NULL,wind=NULL)
+  observeEvent(input$profile_sg_3,{
+    prof_sg$der <- as.numeric(input$profile_sg_3)
+  })
+  observeEvent(input$profile_sg_4,{
+    prof_sg$pol <- as.numeric(input$profile_sg_4)
+  })
+  observeEvent(input$profile_sg_5,{
+    prof_sg$wind <- as.numeric(input$profile_sg_5)
+  })
+  
+  
+  
+  
+  
 
   output$profile_plot <- renderPlot({
     req(!is.null(dati$DS))
@@ -681,6 +839,97 @@ server <- function (input , output, session ){
       dati$DS <- cbind.data.frame(M_s,M)
       dati$var_qt <- dati$var_qt[dati$var_qt%in%colnames(dati$DS)]
     }
+    
+    
+    
+    # da sistemare con observeevent......
+    
+    
+    if(input$profile_transf=='Savitzky-Golay'){
+      M <- dati$DS[,dati$var_qt]
+      M_s <- dati$DS[,!colnames(dati$DS)%in%dati$var_qt]
+      if(!is.null(input$var_y)){
+        M <- M[,colnames(M)!=input$var_y]
+        M_s <- cbind.data.frame(M_s,dati$DS[,input$var_y])
+        colnames(M_s)[length(colnames(M_s))] <- input$var_y
+      }
+      
+
+      
+      
+      observeEvent(input$profile_sg_1,{
+        cl_start<-which(colnames(M)==input$profile_sg_1)
+        req(!identical(cl_start, integer(0)))
+        observeEvent(input$profile_sg_2,{
+          cl_end<-which(colnames(M)==input$profile_sg_2)
+          req(!identical(cl_end, integer(0)))
+          M_sg<-M[,cl_start:cl_end,drop=FALSE]
+          observeEvent(input$profile_sg_3,{
+            req(!is.null(prof_sg$der))
+            req(!is.na(prof_sg$der))
+            m<-prof_sg$der
+            observeEvent(input$profile_sg_4,{
+              req(!is.null(prof_sg$pol))
+              req(!is.na(prof_sg$pol))
+              p<-prof_sg$pol
+              
+              observeEvent(input$profile_sg_5,{
+                req(!is.null(prof_sg$wind))
+                req(!is.na(prof_sg$wind))
+                w<-prof_sg$wind
+                
+                Z<-savitzkyGolay(X = M_sg,m = m,p = p,w = w)
+                
+                
+                if(cl_start==1&cl_end==ncol(M)) M<-Z
+                if(cl_start==1&cl_end<ncol(M)){
+                  nc<-as.numeric(cl_end)+1
+                  M<-cbind.data.frame(Z,M[,nc:ncol(M),drop=FALSE])
+                }
+                if(cl_start>1&cl_end==ncol(M)){
+                  nc<-as.numeric(cl_start)-1
+                  M<-cbind.data.frame(M[,1:nc,drop=FALSE],Z)
+                }
+                if(cl_start>1&cl_end<ncol(M)){
+                  nc<-as.numeric(cl_start)-1;nc_1<-as.numeric(cl_end)+1
+                  M<-cbind.data.frame(M[,1:nc,drop=FALSE],Z,M[,nc_1:ncol(M),drop=FALSE])
+                }
+                
+                
+                
+                dati$DS <- cbind.data.frame(M_s,M)
+                dati$var_qt <- colnames(M)
+
+                
+                
+              })
+            })
+          })
+            
+     
+
+          
+
+        })
+      })
+
+      
+      
+      
+     
+      
+      
+
+      
+      
+    }
+    
+    
+    
+    
+    
+    
+    
     trsf$testo <- paste(trsf$testo,'-',input$profile_transf, '-')
     trsf <- input$profile_transf
   })
@@ -695,6 +944,10 @@ server <- function (input , output, session ){
     trsf$testo=NULL
     reset('profile_transf')
     prof_bin_3$ampl <- NULL
+    
+    prof_sg$der <- NULL
+    prof_sg$pol <- NULL
+    prof_sg$wind <- NULL
 
   })
   
@@ -1759,6 +2012,12 @@ server <- function (input , output, session ){
                      onInitialize = I('function() { this.setValue(""); }')
                    ))
   })
+  
+  pls_pred_data <- reactiveValues(var_y=NULL)
+  observeEvent(input$pls_pred_data_var_y,{
+    req(input$pls_pred_y_chk)
+    pls_pred_data$var_y <- input$pls_pred_data_var_y
+  })
     
   observeEvent(input$bplsext,{
     if(is.null(PLS$res)){
@@ -1771,31 +2030,37 @@ server <- function (input , output, session ){
                        text = 'Load data set to be predicted!',
                        type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
       }else{
-        M_<-dati_ext$DS
-        M_<-data.frame(M_)
-        if(input$pls_pred_y_chk){
-          Y_ <- dati_ext$DS[,input$pls_pred_data_var_y]
+        if(pls_pred_data$var_y==""){
+          sendSweetAlert(session, title = "Input Error",
+                         text = 'Select response variable',
+                         type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
         }else{
-          Y_<-rep(0,nrow(M_))
-        }
-        ncomp <- as.numeric(input$pls_n_comp_df)
-        prm<-drop(predict(PLS$res,newdata=M_,ncomp=1:ncomp,scale=PLS$scale))
-        PLS_ext$prm <- prm
-        prm.tr<-drop(predict(PLS$res,newdata=NULL,ncomp=1:ncomp,scale=PLS$scale))
-        PLS_ext$prm.tr <- prm.tr
-        if(input$pls_pred_y_chk){
-          rmsep<-RMSEP(PLS$res,ncomp=ncomp,scale=PLS$scale,
-                       intercept=FALSE)$val[1,,]
-          PLS_ext$rmsep <- rmsep
-        }
-        if(nrow(M_)==1){
-          prm<-matrix(unlist(prm),1,ncomp)
+          M_<-dati_ext$DS
+          M_<-data.frame(M_)
+          if(input$pls_pred_y_chk){
+            Y_ <- dati_ext$DS[,input$pls_pred_data_var_y]
+          }else{
+            Y_<-rep(0,nrow(M_))
+          }
+          ncomp <- as.numeric(input$pls_n_comp_df)
+          prm<-drop(predict(PLS$res,newdata=M_,ncomp=1:ncomp,scale=PLS$scale))
           PLS_ext$prm <- prm
+          prm.tr<-drop(predict(PLS$res,newdata=NULL,ncomp=1:ncomp,scale=PLS$scale))
+          PLS_ext$prm.tr <- prm.tr
+          if(input$pls_pred_y_chk){
+            rmsep<-RMSEP(PLS$res,ncomp=ncomp,scale=PLS$scale,
+                         intercept=FALSE)$val[1,,]
+            PLS_ext$rmsep <- rmsep
+          }
+          if(nrow(M_)==1){
+            prm<-matrix(unlist(prm),1,ncomp)
+            PLS_ext$prm <- prm
+          }
+          res<-prm[,ncomp]-Y_
+          PLS_ext$res <- res
+          res.tr<-prm.tr[,ncomp]-PLS$dataset[,1]
+          PLS_ext$res.tr <- res.tr
         }
-        res<-prm[,ncomp]-Y_
-        PLS_ext$res <- res
-        res.tr<-prm.tr[,ncomp]-PLS$dataset[,1]
-        PLS_ext$res.tr <- res.tr
       }
       }
   })
@@ -1816,6 +2081,7 @@ server <- function (input , output, session ){
   
   output$pls_ext_data_rnames <- renderUI({
     req(!is.null(PLS_ext$res))
+    req(input$pls_pred_y_chk)
     checkboxInput("pls_ext_data_rnames", label = "Row names", value = FALSE)
   })
   
@@ -1823,6 +2089,7 @@ server <- function (input , output, session ){
     req(!is.null(PLS_ext$res))
     req(input$pls_pred_data_var_y)
     req(input$pls_pred_y_chk==TRUE)
+    req(!is.null(input$pls_ext_data_rnames))
     M_<-dati_ext$DS
     M_<-data.frame(M_)
     Y_ <- dati_ext$DS[,input$pls_pred_data_var_y]

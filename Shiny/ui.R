@@ -39,7 +39,7 @@ sidebar<- dashboardSidebar(
                          br(),
                          actionButton("quit", "Quit",onclick = "setTimeout(function(){window.close();},200);",
                                       style='padding:4px; font-size:80%'),
-                         HTML('<p><center><font color="cyan"><br> Version 1.1 </font></center>')
+                         HTML('<p><center><font color="cyan"><br> Version 1.2 </font></center>')
                 )
                         ))
 
@@ -138,7 +138,7 @@ body<-dashboardBody(
                                                  uiOutput('var_quanti_sup')),
                                              column(8,"Quantitative variables for pls",
                                                 verbatimTextOutput("var_quanti"))),
-                                    tabPanel("Responce variable",
+                                    tabPanel("Response variable",
                                              column(12,
                                                     uiOutput("var_y")))
                                     ))),
@@ -177,6 +177,11 @@ body<-dashboardBody(
                                uiOutput('profile_bin_1'),
                                uiOutput('profile_bin_2'),
                                uiOutput('profile_bin_3'),
+                               uiOutput('profile_sg_1'),
+                               uiOutput('profile_sg_2'),
+                               uiOutput('profile_sg_3'),
+                               uiOutput('profile_sg_4'),
+                               uiOutput('profile_sg_5'),
                                actionButton("profile_reset","Reset",style='padding:4px; font-size:80%')
                                ),
                         column(12,
