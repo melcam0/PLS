@@ -504,7 +504,7 @@ server <- function (input , output, session ){
     selectizeInput(inputId = "var_y"," ",
                    choices = dati$var_qt,
                    options = list(
-                     placeholder = 'Select responce variable',
+                     placeholder = 'Select response variable',
                      onInitialize = I('function() { this.setValue(""); }')
                    ))
   })
@@ -965,9 +965,10 @@ server <- function (input , output, session ){
   output$pcr_n_comp<-renderUI({
     req(dati$var_qt)
     n <- length(dati$var_qt)-length(input$var_y)
+    sel <- min(10,n)
     selectInput("pcr_n_comp", label = "Max. number of components", 
                 choices = c(2:n), 
-                selected = 10)
+                selected = sel)
   })
   
   output$pcr_n_cv<-renderUI({
@@ -987,7 +988,7 @@ server <- function (input , output, session ){
     validate(need(nrow(dati$DS)!=0,""))
     if(is.null(input$var_y)){
       sendSweetAlert(session, title = "Input Error",
-                     text = 'Select responce variable!',
+                     text = 'Select response variable!',
                      type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
     }else{
       M_<-dati$DS[,dati$var_qt]
@@ -1017,14 +1018,14 @@ server <- function (input , output, session ){
                    scale=as.logical(input$pcr_scale))
         PLS$res <- res
         PLS$resf <- resf
-        # PLS$ncompo <- ncompo
+        PLS$ncompo <- ncompo
         PLS$typ<-'PCR'
         PLS$dataset<-M_
         PLS$nY<-nY
         PLS$validation<-'CV'
-        # PLS$nseg<-as.numeric(input$n_cv)
+        PLS$nseg<-as.numeric(input$n_cv)
         PLS$segtype<-'interleaved'
-        # PLS$scale<-as.logical(input$pcr_scale)
+        PLS$scale<-as.logical(input$pcr_scale)
         PLS$model<-as.formula(model)
         if(input$pcr_cv_choise=="2"){
           N<-c(NULL)
@@ -1118,14 +1119,16 @@ server <- function (input , output, session ){
     req(!is.null(PLS$res))
     req(PLS$typ=='PCR')
     if(input$pcr_cv_choise=="1"){
-      vm<-R2(PLS$res,estimate='CV',ncomp=1:as.numeric(input$pcr_n_comp),intercept=FALSE)$val[1,,]*100
+      vm<-R2(PLS$res,estimate='CV',ncomp=1:as.numeric(PLS$ncompo),intercept=FALSE)$val[1,,]*100
       rmsep<-RMSEP(PLS$res,intercep=FALSE)
       op<-par(pty='s',mfrow=c(1,2))
-      plot(rmsep$val[1,,],xlab='Number of Components',ylab='RMSECV',main='');grid()
+      plot(rmsep$val[1,,],xlab='Number of Components',ylab='RMSECV',main='',xaxt='n');grid()
       lines(rmsep$val[1,,])
-      vm<-R2(PLS$res,estimate='CV',ncomp=1:as.numeric(input$pcr_n_comp),intercept=FALSE)$val[1,,]*100
-      plot(vm,xlab='Number of Components',ylab='CV % Explained Variance',ylim=c(min(0,min(vm)),100));grid()#
+      axis(1,at=1:PLS$ncompo)
+      vm<-R2(PLS$res,estimate='CV',ncomp=1:as.numeric(PLS$ncompo),intercept=FALSE)$val[1,,]*100
+      plot(vm,xlab='Number of Components',ylab='CV % Explained Variance',ylim=c(min(0,min(vm)),100),xaxt='n');grid()#
       lines(vm)
+      axis(1,at=1:PLS$ncompo)
       par(op)
     }
     if(input$pcr_cv_choise=="2"){
@@ -1136,19 +1139,22 @@ server <- function (input , output, session ){
       
       op<-par(pty='s',mfrow=c(2,2))
       plot(sqrt(apply(PLS$D^2,2,mean))[-1],xlab='Number of Components',ylab='Global RMSECV',main='',
-           ylim = c(min(D_min),max(D_max)));grid()
+           ylim = c(min(D_min),max(D_max)),xaxt='n');grid()
       lines(sqrt(apply(PLS$D^2,2,mean))[-1]) 
       lines(D_min,col='red',lty = 2)
       lines(D_max,col='red',lty = 2)
+      axis(1,at=1:PLS$ncompo)
       
       plot(PLS$R_sq*100,xlab='Number of Components',ylab='CV % Explained Variance',
-           ylim=c(min(0,min(PLS$R_sq*100)),100));grid()
+           ylim=c(min(0,min(PLS$R_sq*100)),100),xaxt='n');grid()
       lines(PLS$R_sq*100)
+      axis(1,at=1:PLS$ncompo)
       
       N <- PLS$D[,1]
       N<-c(N,min(N):max(N))
       F<-as.factor(N)
-      plot(F[1:as.numeric(input$pcr_n_rnd)],xlab='Number of Components',ylab='Frequency')
+      plot(F[1:as.numeric(input$pcr_n_rnd)],xlab='Number of Components',ylab='Frequency',xaxt='n')
+      axis(1,at=1:PLS$ncompo)
       par(op)
       
     }
@@ -1210,9 +1216,10 @@ server <- function (input , output, session ){
   output$pls_n_comp<-renderUI({
     req(dati$var_qt)
     n <- length(dati$var_qt)-length(input$var_y)
+    sel <- min(10,n)
     selectInput("pls_n_comp", label = "Max. number of components", 
                 choices = c(2:n), 
-                selected = 10)
+                selected = sel)
       })
 
   output$pls_n_cv<-renderUI({
@@ -1232,7 +1239,7 @@ server <- function (input , output, session ){
    validate(need(nrow(dati$DS)!=0,""))
     if(is.null(input$var_y)){
       sendSweetAlert(session, title = "Input Error",
-                     text = 'Select responce variable!',
+                     text = 'Select response variable!',
                      type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
     }else{
       M_<-dati$DS[,dati$var_qt]
@@ -1252,7 +1259,7 @@ server <- function (input , output, session ){
           M_<-as.data.frame(M_)
         }
         # M._<-M_  # ????
-        ncompo<-min(as.numeric(input$pls_n_comp),ncol(M_)-1)
+        ncompo<-min(as.integer(input$pls_n_comp),ncol(M_)-1)
         model<-paste(naM[nY],'~',(paste(naM[-nY],collapse='+')),sep='')
         
         
@@ -1262,14 +1269,14 @@ server <- function (input , output, session ){
                    scale=as.logical(input$pls_scale))
         PLS$res <- res
         PLS$resf <- resf
-        # PLS$ncompo <- ncompo
+        PLS$ncompo <- ncompo
         PLS$typ<-'PLS'
         PLS$dataset<-M_
         PLS$nY<-nY
         PLS$validation<-'CV'
-        # PLS$nseg<-as.numeric(input$n_cv)
+        PLS$nseg<-as.numeric(input$n_cv)
         PLS$segtype<-'interleaved'
-        # PLS$scale<-as.logical(input$pls_scale)
+        PLS$scale<-as.logical(input$pls_scale)
         PLS$model<-as.formula(model)
         if(input$pls_cv_choise=="2"){
           N<-c(NULL)
@@ -1311,7 +1318,7 @@ server <- function (input , output, session ){
     validate(need(nrow(dati$DS)!=0,"Load a dataset!"))
     validate(need(!is.null(PLS$res),"Execute the model!"))
     req(input$pls_cv_choise=="1")
-    vm<-R2(PLS$res,estimate='CV',ncomp=1:input$pls_n_comp,intercept=FALSE)$val[1,,]*100
+    vm<-R2(PLS$res,estimate='CV',ncomp=1:PLS$ncompo,intercept=FALSE)$val[1,,]*100
     rmsep<-RMSEP(PLS$res,intercep=FALSE)
     cat(' ',"\n")
     cat('CV% Explained Variance',"\n")
@@ -1353,7 +1360,7 @@ server <- function (input , output, session ){
   
   output$plsmodel_out_df <- renderPrint({
     req(!is.null(PLS$res))
-    # cat(paste('Model created with ',format(as.numeric(input$pls_n_comp_df),digits=2),
+    # cat(paste('Model created with ',format(as.numeric(PLS$ncompo_df),digits=2),
     #           ' components',sep=''))
     cat(paste('Model', PLS$typ, 'created with '),'\n')
     cat(paste(format(as.numeric(input$pls_n_comp_df),digits=2),' components',sep=''))
@@ -1363,14 +1370,16 @@ server <- function (input , output, session ){
     req(!is.null(PLS$res))
     req(PLS$typ=='PLS')
     if(input$pls_cv_choise=="1"){
-      vm<-R2(PLS$res,estimate='CV',ncomp=1:as.numeric(input$pls_n_comp),intercept=FALSE)$val[1,,]*100
+      vm<-R2(PLS$res,estimate='CV',ncomp=1:as.numeric(PLS$ncompo),intercept=FALSE)$val[1,,]*100
       rmsep<-RMSEP(PLS$res,intercep=FALSE)
       op<-par(pty='s',mfrow=c(1,2))
-      plot(rmsep$val[1,,],xlab='Number of Components',ylab='RMSECV',main='');grid()
+      plot(rmsep$val[1,,],xlab='Number of Components',ylab='RMSECV',main='',xaxt='n');grid()
       lines(rmsep$val[1,,])
-      vm<-R2(PLS$res,estimate='CV',ncomp=1:as.numeric(input$pls_n_comp),intercept=FALSE)$val[1,,]*100
-      plot(vm,xlab='Number of Components',ylab='CV % Explained Variance',ylim=c(min(0,min(vm)),100));grid()#
+      axis(1,at=1:PLS$ncompo)
+      vm<-R2(PLS$res,estimate='CV',ncomp=1:as.integer(PLS$ncompo),intercept=FALSE)$val[1,,]*100
+      plot(vm,xlab='Number of Components',ylab='CV % Explained Variance',ylim=c(min(0,min(vm)),100),xaxt='n');grid()#
       lines(vm)
+      axis(1,at=1:PLS$ncompo)
       par(op)
     }
     if(input$pls_cv_choise=="2"){
@@ -1380,19 +1389,22 @@ server <- function (input , output, session ){
       
       op<-par(pty='s',mfrow=c(2,2))
       plot(sqrt(apply(PLS$D^2,2,mean))[-1],xlab='Number of Components',ylab='Global RMSECV',main='',
-           ylim = c(min(D_min),max(D_max)));grid()
+           ylim = c(min(D_min),max(D_max)),xaxt='n');grid()
       lines(sqrt(apply(PLS$D^2,2,mean))[-1]) 
       lines(D_min,col='red',lty = 2)
       lines(D_max,col='red',lty = 2)
+      axis(1,at=1:PLS$ncompo)
       
       plot(PLS$R_sq*100,xlab='Number of Components',ylab='CV % Explained Variance',
-           ylim=c(min(0,min(PLS$R_sq*100)),100));grid()
+           ylim=c(min(0,min(PLS$R_sq*100)),100),xaxt='n');grid()
       lines(PLS$R_sq*100)
+      axis(1,at=1:PLS$ncompo)
       
       N <- PLS$D[,1]
       N<-c(N,min(N):max(N))
       F<-as.factor(N)
-      plot(F[1:as.numeric(input$pls_n_rnd)],xlab='Number of Components',ylab='Frequency')
+      plot(F[1:as.integer(input$pls_n_rnd)],xlab='Number of Components',ylab='Frequency')
+      # axis(1,at=1:PLS$ncompo)
       par(op)
       
     }
@@ -1495,7 +1507,7 @@ server <- function (input , output, session ){
     if(as.logical(input$pls_expvsfitted_rnames))tex<-row.names(dati$DS)
     if(is.null(input$var_y)){
       sendSweetAlert(session, title = "Input Error",
-                     text = 'Select responce variable!',
+                     text = 'Select response variable!',
                      type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
     }else{
       ms<-dati$DS[,input$var_y]
@@ -1581,7 +1593,7 @@ server <- function (input , output, session ){
     if(as.logical(input$pls_res_rnames))tex<-row.names(dati$DS)
     if(is.null(input$var_y)){
       sendSweetAlert(session, title = "Input Error",
-                     text = 'Select responce variable!',
+                     text = 'Select response variable!',
                      type = "warning",btn_labels = "Ok", html = FALSE, closeOnClickOutside = TRUE)
     }else{
       ms<-dati$DS[,input$var_y]
@@ -1790,7 +1802,6 @@ server <- function (input , output, session ){
     checkboxInput("pls_load_cnames", label = "Column names", value = FALSE)
   })
   
-  
   output$loading_pl <- renderPlot({
     # req(!is.null(PLS$res))
     validate(need(!is.null(PLS$res),"Compute the model!"))
@@ -1826,7 +1837,8 @@ server <- function (input , output, session ){
       
       M_<-dati$DS[,dati$var_qt]
       if(!is.null(input$var_y))M_ <- M_[,colnames(M_)!=input$var_y]
-      at=c(seq(1,length(colnames(M_)),(length(colnames(M_))-1)/4),length(colnames(M_)))
+      at <- 1:length(colnames(M_))
+      if(length(colnames(M_))>=8)at=c(seq(1,length(colnames(M_)),(length(colnames(M_))-1)/4),length(colnames(M_)))
       assex <- 1:length(colnames(M_))
       x_lab <- 'Variable Number'
       if(input$pls_load_chk){
@@ -1909,7 +1921,9 @@ server <- function (input , output, session ){
     #print(Cm)
     M_<-dati$DS[,dati$var_qt]
     if(!is.null(input$var_y))M_ <- M_[,colnames(M_)!=input$var_y]
-    at=c(seq(1,length(colnames(M_)),(length(colnames(M_))-1)/4),length(colnames(M_)))
+    
+    at <- 1:length(colnames(M_))
+    if(length(colnames(M_))>=8)at=c(seq(1,length(colnames(M_)),(length(colnames(M_))-1)/4),length(colnames(M_)))
     assex <- 1:length(colnames(M_))
     x_lab <- 'Variable Number'
     if(input$  pls_coeff_chk){
@@ -1928,15 +1942,13 @@ server <- function (input , output, session ){
     }
   })
 
-  output$pls_coeff_dwl <- downloadHandler(
-    filename = "coeff.xlsx",
+  output$pls_coefficients_dwl <- downloadHandler(
+    filename = "coefficients.xlsx",
     content = function(file) {
       if (is.null(PLS$res$scale))Cm<-PLS$res$coefficients[,1,]
       if (!is.null(PLS$res$scale))Cm<-PLS$res$coefficients[,1,]/PLS$res$scale
-      # df <- loadings(PLS$res)[,]
       write.xlsx(Cm, file,colNames=TRUE)
     })
-  
 
 # PLS - prediction --------------------------------------------------------
 
@@ -2008,7 +2020,7 @@ server <- function (input , output, session ){
     selectizeInput(inputId = "pls_pred_data_var_y"," ",
                    choices = colnames(dati_ext$DS),
                    options = list(
-                     placeholder = 'Select responce variable',
+                     placeholder = 'Select response variable',
                      onInitialize = I('function() { this.setValue(""); }')
                    ))
   })
