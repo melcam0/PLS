@@ -219,7 +219,8 @@ tabItem(tabName = "pcr_CV",
                          uiOutput('pcr_n_rnd'),
                          br(),
                          uiOutput('pcr_n_comp_df'),
-                         verbatimTextOutput('pcrmodel_out_df'))
+                         verbatimTextOutput('pcrmodel_out_df')
+                         )
         )
 ),
 
@@ -355,10 +356,12 @@ tabItem(tabName = "load",
                                         selected = "sca", inline=TRUE)),
                   column(2),
                   column(12),
-                  column(10,
-                         plotOutput('loading_pl',height = "600px"),
+                  column(2),
+                  column(6,
+                         plotOutput('loading_pl',height = "600px",width = "600px"),
                          br(),
                          downloadButton("pls_loading_dwl")),
+                  column(2),
                   column(2,
                          uiOutput('pls_load_compx'),
                          uiOutput('pls_load_compy'),

@@ -839,12 +839,7 @@ server <- function (input , output, session ){
       dati$DS <- cbind.data.frame(M_s,M)
       dati$var_qt <- dati$var_qt[dati$var_qt%in%colnames(dati$DS)]
     }
-    
-    
-    
-    # da sistemare con observeevent......
-    
-    
+
     if(input$profile_transf=='Savitzky-Golay'){
       M <- dati$DS[,dati$var_qt]
       M_s <- dati$DS[,!colnames(dati$DS)%in%dati$var_qt]
@@ -853,9 +848,6 @@ server <- function (input , output, session ){
         M_s <- cbind.data.frame(M_s,dati$DS[,input$var_y])
         colnames(M_s)[length(colnames(M_s))] <- input$var_y
       }
-      
-
-      
       
       observeEvent(input$profile_sg_1,{
         cl_start<-which(colnames(M)==input$profile_sg_1)
@@ -895,40 +887,15 @@ server <- function (input , output, session ){
                   M<-cbind.data.frame(M[,1:nc,drop=FALSE],Z,M[,nc_1:ncol(M),drop=FALSE])
                 }
                 
-                
-                
                 dati$DS <- cbind.data.frame(M_s,M)
                 dati$var_qt <- colnames(M)
-
-                
                 
               })
             })
           })
-            
-     
-
-          
-
         })
       })
-
-      
-      
-      
-     
-      
-      
-
-      
-      
     }
-    
-    
-    
-    
-    
-    
     
     trsf$testo <- paste(trsf$testo,'-',input$profile_transf, '-')
     trsf <- input$profile_transf
@@ -1101,14 +1068,16 @@ server <- function (input , output, session ){
   
   output$pcr_n_comp_df<-renderUI({
     req(!is.null(PLS$res))
+    req(PLS$typ=='PCR')
     rmsep<-RMSEP(PLS$res,intercep=FALSE)
     selectInput("pcr_n_comp_df", label = "Number of components",
                 choices = c(2:length(dati$var_qt)),
                 selected = which.min(rmsep$val[1,,]))
   })
-  
+
   output$pcrmodel_out_df <- renderPrint({
     req(!is.null(PLS$res))
+    req(PLS$typ=='PCR')
     # cat(paste('Model created with ',format(as.numeric(input$pcr_n_comp_df),digits=2),
     #           ' components',sep=''))
     cat(paste('Model', PLS$typ, 'created with '),'\n')
@@ -1352,6 +1321,7 @@ server <- function (input , output, session ){
   
   output$pls_n_comp_df<-renderUI({
     req(!is.null(PLS$res))
+    req(PLS$typ=='PLS')
     rmsep<-RMSEP(PLS$res,intercep=FALSE)
     selectInput("pls_n_comp_df", label = "Number of components",
                 choices = c(2:length(dati$var_qt)),
@@ -1360,6 +1330,7 @@ server <- function (input , output, session ){
   
   output$plsmodel_out_df <- renderPrint({
     req(!is.null(PLS$res))
+    req(PLS$typ=='PLS')
     # cat(paste('Model created with ',format(as.numeric(PLS$ncompo_df),digits=2),
     #           ' components',sep=''))
     cat(paste('Model', PLS$typ, 'created with '),'\n')
@@ -1512,20 +1483,24 @@ server <- function (input , output, session ){
     }else{
       ms<-dati$DS[,input$var_y]
       op<-par(pty='s',mfrow=c(1,2))
-      ft<-PLS$resf$fitted.values[,,as.numeric(input$pls_n_comp_df)]
+      if(PLS$typ=='PCR')n_comp_df <- as.numeric(input$pcr_n_comp_df)
+      if(PLS$typ=='PLS')n_comp_df <- as.numeric(input$pls_n_comp_df)
+
+      ft<-PLS$resf$fitted.values[,,n_comp_df]
       yl<-c(min(ft,ms),max(ft,ms))
+
       plot(ms,ft,xlab='Experimental Value',ylab='Fitted Value',xlim=yl,ylim=yl,
-           main=paste('Model with',input$pls_n_comp_df,'Comp.'),type='n')
+           main=paste('Model with',n_comp_df,'Comp.'),type='n')
       lines(par('usr')[1:2],par('usr')[3:4]);grid()
       if((is.null(g))&(is.null(tex)))points(ms,ft,col='black')
       if((!is.null(g))&(is.null(tex)))points(ms,ft,col=vcolor[as.numeric(g)])
       if((is.null(g))&(!is.null(tex)))text(ms,ft,as.character(tex),cex=0.7)
       if((!is.null(g))&(!is.null(tex)))text(ms,ft,as.character(tex),col=vcolor[as.numeric(g)],cex=0.7)
       
-      ft<-PLS$res$validation$pred[,,as.numeric(input$pls_n_comp_df)]
+      ft<-PLS$res$validation$pred[,,n_comp_df]
       yl<-c(min(ft,ms),max(ft,ms))
       plot(ms,ft,xlab='Experimental Value',ylab='CV Value',xlim=yl,ylim=yl,
-           main=paste('Model with',PLS$pls_ncomp,'Comp.'),type='n')
+           main=paste('Model with',n_comp_df,'Comp.'),type='n')
       lines(par('usr')[1:2],par('usr')[3:4]);grid()
       if((is.null(g))&(is.null(tex)))points(ms,ft,col='black')
       if((!is.null(g))&(is.null(tex)))points(ms,ft,col=vcolor[as.numeric(g)])
@@ -1538,8 +1513,10 @@ server <- function (input , output, session ){
   output$pls_fitting_dwl <- downloadHandler(
     filename = "fitted.xlsx", 
     content = function(file) {
-      ft<-PLS$resf$fitted.values[,,as.numeric(input$pls_n_comp_df)]
-      ft_cv<-PLS$res$validation$pred[,,as.numeric(input$pls_n_comp_df)]
+      if(PLS$typ=='PCR')n_comp_df <- as.numeric(input$pcr_n_comp_df)
+      if(PLS$typ=='PLS')n_comp_df <- as.numeric(input$pls_n_comp_df)
+      ft<-PLS$resf$fitted.values[,,n_comp_df]
+      ft_cv<-PLS$res$validation$pred[,,n_comp_df]
       df<-cbind.data.frame('Fitted Value'=ft,'CV Value'=ft_cv)
       write.xlsx(df, file,colNames=TRUE)
     })
@@ -1598,17 +1575,21 @@ server <- function (input , output, session ){
     }else{
       ms<-dati$DS[,input$var_y]
       op<-par(pty='s',mfrow=c(1,2))
-      rs<-PLS$resf$fitted.values[,,as.numeric(input$pls_n_comp_df)]-ms
+      
+      if(PLS$typ=='PCR')n_comp_df <- as.numeric(input$pcr_n_comp_df)
+      if(PLS$typ=='PLS')n_comp_df <- as.numeric(input$pls_n_comp_df)
+
+      rs<-PLS$resf$fitted.values[,,n_comp_df]-ms
       plot(1:length(rs),rs,type='n',xlab='Object Number',ylim=c(min(0,rs),max(0,rs)),
-           ylab=paste('Residuals in Fitting with ',as.numeric(input$pls_n_comp_df),' Comp.'));grid();
+           ylab=paste('Residuals in Fitting with ',n_comp_df,' Comp.'));grid();
       abline(h=0,col="red")
       if((is.null(g))&(is.null(tex)))points(1:length(rs),rs,col='black')
       if((!is.null(g))&(is.null(tex)))points(1:length(rs),rs,col=vcolor[as.numeric(g)],pch=16)
       if((is.null(g))&(!is.null(tex)))text(1:length(rs),rs,as.character(tex),cex=0.8,pch=16)
       if((!is.null(g))&(!is.null(tex)))text(1:length(rs),rs,as.character(tex),
                                             col=vcolor[as.numeric(g)],cex=0.8)
-      rs<-PLS$res$validation$pred[,,as.numeric(input$pls_n_comp_df)]-ms
-      plot(1:length(rs),rs,xlab='Object Number',ylab=paste('Residuals in CV with ',input$pls_n_comp_df,
+      rs<-PLS$res$validation$pred[,,n_comp_df]-ms
+      plot(1:length(rs),rs,xlab='Object Number',ylab=paste('Residuals in CV with ',n_comp_df,
                                                            ' Comp.'),type='n',ylim=c(min(0,rs),max(0,rs)));grid()
       abline(h=0,col="red")
       if((is.null(g))&(is.null(tex)))points(1:length(rs),rs,col='black')
@@ -1624,8 +1605,12 @@ server <- function (input , output, session ){
     filename = "residuals.xlsx", 
     content = function(file) {
       ms<-dati$DS[,input$var_y]
-      rs<-PLS$resf$fitted.values[,,as.numeric(input$pls_n_comp_df)]-ms
-      rs_cv<-PLS$res$validation$pred[,,as.numeric(input$pls_n_comp_df)]-ms
+   
+      if(PLS$typ=='PCR')n_comp_df <- as.numeric(input$pcr_n_comp_df)
+      if(PLS$typ=='PLS')n_comp_df <- as.numeric(input$pls_n_comp_df)
+      
+      rs<-PLS$resf$fitted.values[,,n_comp_df]-ms
+      rs_cv<-PLS$res$validation$pred[,,n_comp_df]-ms
       df<-cbind.data.frame('Residuals'=rs,'Residuals in CV'=rs_cv)
       write.xlsx(df, file,colNames=TRUE)
     })
@@ -1635,15 +1620,19 @@ server <- function (input , output, session ){
 
   output$pls_score_compx <- renderUI({
     req(!is.null(PLS$res))
+    if(PLS$typ=='PCR')n_comp_df <- as.numeric(input$pcr_n_comp_df)
+    if(PLS$typ=='PLS')n_comp_df <- as.numeric(input$pls_n_comp_df)
     selectInput("pls_score_compx", label = "Component on x-axis",
-                choices = 1:as.numeric(input$pls_n_comp_df),
+                choices = 1:n_comp_df,
                 selected = 1)
   })
   
   output$pls_score_compy <- renderUI({
     req(!is.null(PLS$res))
+    if(PLS$typ=='PCR')n_comp_df <- as.numeric(input$pcr_n_comp_df)
+    if(PLS$typ=='PLS')n_comp_df <- as.numeric(input$pls_n_comp_df)
     selectInput("pls_score_compy", label = "Component on y-axis",
-                choices = 1:as.numeric(input$pls_n_comp_df),
+                choices = 1:n_comp_df,
                 selected = 2)
   })
   
@@ -1750,16 +1739,20 @@ server <- function (input , output, session ){
   output$pls_load_compx <- renderUI({
     req(!is.null(PLS$res))
     req(input$pls_radio_load_type=='sca')
+    if(PLS$typ=='PCR')n_comp_df <- as.numeric(input$pcr_n_comp_df)
+    if(PLS$typ=='PLS')n_comp_df <- as.numeric(input$pls_n_comp_df)
     selectInput("pls_load_compx", label = "Component on x-axis", 
-                choices = 1:as.numeric(input$pls_n_comp_df), 
+                choices = 1:n_comp_df, 
                 selected = 1)
   })
   
   output$pls_load_compy <- renderUI({
     req(!is.null(PLS$res))
     req(input$pls_radio_load_type=='sca')
+    if(PLS$typ=='PCR')n_comp_df <- as.numeric(input$pcr_n_comp_df)
+    if(PLS$typ=='PLS')n_comp_df <- as.numeric(input$pls_n_comp_df)
     selectInput("pls_load_compy", label = "Component on y-axis", 
-                choices = 1:as.numeric(input$pls_n_comp_df), 
+                choices = 1:n_comp_df, 
                 selected = 2)
   })
   
@@ -1875,15 +1868,19 @@ server <- function (input , output, session ){
 # PLS - biplot ------------------------------------------------------------
   output$pls_biplot_compx <- renderUI({
     req(!is.null(PLS$res))
+    if(PLS$typ=='PCR')n_comp_df <- as.numeric(input$pcr_n_comp_df)
+    if(PLS$typ=='PLS')n_comp_df <- as.numeric(input$pls_n_comp_df)
     selectInput("pls_biplot_compx", label = "Component on x-axis", 
-                choices = 1:as.numeric(input$pls_n_comp_df), 
+                choices = 1:n_comp_df, 
                 selected = 1)
   })
   
   output$pls_biplot_compy <- renderUI({
     req(!is.null(PLS$res))
+    if(PLS$typ=='PCR')n_comp_df <- as.numeric(input$pcr_n_comp_df)
+    if(PLS$typ=='PLS')n_comp_df <- as.numeric(input$pls_n_comp_df)
     selectInput("pls_biplot_compy", label = "Component on y-axis", 
-                choices = 1:as.numeric(input$pls_n_comp_df), 
+                choices = 1:n_comp_df, 
                 selected = 2)
   })
   
@@ -2054,7 +2051,11 @@ server <- function (input , output, session ){
           }else{
             Y_<-rep(0,nrow(M_))
           }
-          ncomp <- as.numeric(input$pls_n_comp_df)
+        
+          if(PLS$typ=='PCR') ncomp <- as.numeric(input$pcr_n_comp_df)
+          if(PLS$typ=='PLS') ncomp <- as.numeric(input$pls_n_comp_df)
+          
+          # ncomp <- as.numeric(input$pls_n_comp_df)
           prm<-drop(predict(PLS$res,newdata=M_,ncomp=1:ncomp,scale=PLS$scale))
           PLS_ext$prm <- prm
           prm.tr<-drop(predict(PLS$res,newdata=NULL,ncomp=1:ncomp,scale=PLS$scale))
@@ -2087,7 +2088,9 @@ server <- function (input , output, session ){
       cat('',"\n")
     }
     cat('Predicted Values',"\n")
-    print(PLS_ext$prm[,as.numeric(input$pls_n_comp_df)])
+    if(PLS$typ=='PCR')n_comp_df <- as.numeric(input$pcr_n_comp_df)
+    if(PLS$typ=='PLS')n_comp_df <- as.numeric(input$pls_n_comp_df)
+    print(PLS_ext$prm[,n_comp_df])
   })
   
   
@@ -2105,7 +2108,9 @@ server <- function (input , output, session ){
     M_<-dati_ext$DS
     M_<-data.frame(M_)
     Y_ <- dati_ext$DS[,input$pls_pred_data_var_y]
-    ncomp <- as.numeric(input$pls_n_comp_df)
+    if(PLS$typ=='PCR') ncomp <- as.numeric(input$pcr_n_comp_df)
+    if(PLS$typ=='PLS') ncomp <- as.numeric(input$pls_n_comp_df)
+    # ncomp <- as.numeric(input$pls_n_comp_df)
     prm <- PLS_ext$prm
     prm.tr <- PLS_ext$prm.tr
     res <- PLS_ext$res
@@ -2145,7 +2150,9 @@ server <- function (input , output, session ){
   output$pls_coeff_dwl <- downloadHandler(
     filename = "coeff.xlsx",
     content = function(file) {
-      df <- PLS_ext$prm[,input$pls_n_comp_df]
+      if(PLS$typ=='PCR')n_comp_df <- as.numeric(input$pcr_n_comp_df)
+      if(PLS$typ=='PLS')n_comp_df <- as.numeric(input$pls_n_comp_df)
+      df <- PLS_ext$prm[,n_comp_df]
       write.xlsx(df, file,colNames=TRUE)
     })
   
