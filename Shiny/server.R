@@ -275,6 +275,8 @@ server <- function (input , output, session ){
       require(readxl)
       path<-paste("Dati/",input$lista_esempi,".xlsx",sep="")
       df=read_excel(path = path,sheet = 1,col_names = TRUE)
+      suppressWarnings(colnames(df)[!is.na(as.numeric(colnames(df)))]
+                       <-as.numeric(colnames(df)[!is.na(as.numeric(colnames(df)))]))
       dati$DS<-as.data.frame(df)
       dati$DS_nr<-as.data.frame(df)
       dati$DS_righe<-as.data.frame(df)
@@ -318,6 +320,8 @@ server <- function (input , output, session ){
     tryCatch({
       require(readxl)
       df=read_excel(path = input$file_xlsx$datapath,sheet = input$foglio_n,col_names = input$header)
+      suppressWarnings(colnames(df)[!is.na(as.numeric(colnames(df)))]
+                       <-as.numeric(colnames(df)[!is.na(as.numeric(colnames(df)))]))
       dati$DS<-as.data.frame(df)
       dati$DS_nr<-as.data.frame(df)
       dati$DS_righe<-as.data.frame(df)
@@ -376,7 +380,7 @@ server <- function (input , output, session ){
   })
   
   observeEvent(input$file_incolla,{
-      df <- tryCatch(read.DIF(file = "clipboard",header = TRUE,transpose = TRUE),
+      df <- tryCatch(read.DIF(file = "clipboard",header = TRUE,transpose = TRUE,check.names = FALSE),
                    error = function(e) "Selezionare un dataset!")
       df <- type.convert(df)
       dati$DS<-as.data.frame(df)
@@ -696,18 +700,21 @@ server <- function (input , output, session ){
   observeEvent(input$profile_sg_5,{
     prof_sg$wind <- as.numeric(input$profile_sg_5)
   })
-  
-  
-  
-  
-  
 
   output$profile_plot <- renderPlot({
     req(!is.null(dati$DS))
       M_<-dati$DS[,dati$var_qt]
       if(!is.null(input$var_y))M_ <- M_[,colnames(M_)!=input$var_y]
       at <- 1:length((colnames(M_)))
-      if(length((colnames(M_)))>5)at=c(seq(1,length(colnames(M_)),(length(colnames(M_))-1)/4),length(colnames(M_)))
+      tk <- TRUE
+      # if(length((colnames(M_))>15))tk <- FALSE
+      # if(length((colnames(M_)))>9000000000)at=c(seq(1,length(colnames(M_)),(length(colnames(M_))-1)/10),length(colnames(M_)))
+      if(length(colnames(M_))>15){
+        n<-length((colnames(M_)))
+        m<-floor((n-1)/11)
+        at=seq(1,n,m)
+        rm(n,m)
+      }
       assex <- 1:length(colnames(M_))
       if(input$profile_chk){
         assex <- colnames(M_)
@@ -715,7 +722,7 @@ server <- function (input , output, session ){
       if(is.numeric(t(M_))){
         if(is.null(input$profile_col)){
           matplot(y = t(M_),type = "l",lty=1,xlab="",ylab="",xaxt='n')
-          axis(side=1, at=at,labels=assex[at])
+          axis(side=1, at=at,labels=assex[at],cex.axis=0.8,tick=tk)
         }else{
           req(!is.null(input$profile_col))
           grade<-dati$DS_tr[,input$profile_col]
@@ -731,8 +738,8 @@ server <- function (input , output, session ){
             if(tog=="integer")vcolor<-unlist(dovc(as.numeric(lev)))
             if(tog=="character" | tog=="factor"){
               matplot(y = t(M_),type = "l",lty=1,xlab="",ylab="",col=vcolor[grade],xaxt='n')
-              axis(side=1, at=at,labels=assex[at])
-              legend("top", legend=lev,col=vcolor, cex=0.8,lty=1,ncol=min(length(lev),4),inset=c(0,-0.10),xpd=TRUE,bty = "n")
+              axis(side=1, at=at,labels=assex[at],cex.axis=0.8,tick=tk)
+              legend("top", legend=lev,col=vcolor, cex=0.7,lty=1,ncol=min(length(lev),4),inset=c(0,-0.10),xpd=TRUE,bty = "n")
             }else{
               layout(mat=matrix(c(1,2),nrow=1),widths = c(8,0.9))
               par(mar = c(4, 3, 4, 0))
@@ -1827,16 +1834,21 @@ server <- function (input , output, session ){
         # req(length(as.numeric(unlist(str_split(input$pls_load_linecomp,','))))==2)
       T<-loadings(PLS$res)
       vi<-as.numeric(unlist(str_split(input$pls_load_linecomp,',')))
-      
       M_<-dati$DS[,dati$var_qt]
       if(!is.null(input$var_y))M_ <- M_[,colnames(M_)!=input$var_y]
-      at <- 1:length(colnames(M_))
-      if(length(colnames(M_))>=8)at=c(seq(1,length(colnames(M_)),(length(colnames(M_))-1)/4),length(colnames(M_)))
-      assex <- 1:length(colnames(M_))
+      at <- 1:length(rownames(T))
+      tk <- TRUE
+      # if(length(rownames(T))>15)tk <- FALSE
+      if(length(( rownames(T)))>15){
+        n<-length(rownames(T))
+        m<-floor((n-1)/11)
+        at=seq(1,n,m)
+      }
+      assex <- 1:length(rownames(T))
       x_lab <- 'Variable Number'
       if(input$pls_load_chk){
         assex <- colnames(M_)
-        x_lab <- 'Variable Name'
+        x_lab <- ''
       }
       if(sum(is.na(vi))==0){
         ylim <- c(min(T[,vi]),max(T[,vi]))
@@ -1845,7 +1857,7 @@ server <- function (input , output, session ){
              xlab=x_lab,type='n',xaxt='n',
              # ylim=c(min(T),max(T))
              ylim=ylim)
-        axis(side=1, at=at,labels=assex[at])
+        axis(side=1, at=at,labels=assex[at],cex.axis=0.8,tick=tk)
         grid()
         leg <- c(NULL);k=0
         for(i in vi){
@@ -1920,12 +1932,17 @@ server <- function (input , output, session ){
     if(!is.null(input$var_y))M_ <- M_[,colnames(M_)!=input$var_y]
     
     at <- 1:length(colnames(M_))
-    if(length(colnames(M_))>=8)at=c(seq(1,length(colnames(M_)),(length(colnames(M_))-1)/4),length(colnames(M_)))
-    assex <- 1:length(colnames(M_))
+    tk <- TRUE
+    if(length(colnames(M_))>15){
+      n<-length((colnames(PLS$dataset)[-PLS$nY]))
+      m<-floor((n-1)/11)
+      at=seq(1,n,m)
+    }
+    assex <- 1:length(colnames(PLS$dataset)[-PLS$nY])
     x_lab <- 'Variable Number'
     if(input$  pls_coeff_chk){
       assex <- colnames(M_)
-      x_lab <- 'Variable Name'
+      x_lab <- ''
     }
     nCm<-length(Cm[,1])
     if(sum(is.na(vi))==0){
@@ -1964,6 +1981,8 @@ server <- function (input , output, session ){
       df <- tryCatch(
         read_excel(path = path,sheet = 1,col_names = TRUE)
         )
+      suppressWarnings(colnames(df)[!is.na(as.numeric(colnames(df)))]
+                       <-as.numeric(colnames(df)[!is.na(as.numeric(colnames(df)))]))
       dati_ext$DS<-as.data.frame(df)
       dati_ext$DS_nr <- as.data.frame(df)
     }
@@ -1993,13 +2012,15 @@ server <- function (input , output, session ){
   
   observeEvent(input$pls_pred_data_excel,{
     df <- tryCatch(
-      read_excel(path = input$pls_pred_data_excel$datapath,sheet = 1,col_names = TRUE)  )
+      read_excel(path = input$pls_pred_data_excel$datapath,sheet = 1,col_names = TRUE))
+    suppressWarnings(colnames(df)[!is.na(as.numeric(colnames(df)))]
+                     <-as.numeric(colnames(df)[!is.na(as.numeric(colnames(df)))]))
     dati_ext$DS<-as.data.frame(df)
     dati_ext$DS_nr <- as.data.frame(df)
   })
   
   observeEvent(input$pls_pred_data_paste,{
-    df <- tryCatch(read.DIF(file = "clipboard",header = TRUE,transpose = TRUE),
+    df <- tryCatch(read.DIF(file = "clipboard",header = TRUE,transpose = TRUE,check.names = FALSE),
                    error = function(e) "Selezionare un dataset!")
     df <- type.convert(df)
     dati_ext$DS<-as.data.frame(df)
