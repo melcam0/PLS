@@ -1,7 +1,0 @@
-Install the PLS and R-Portable program (required for DoE to work).
-All necessary libraries are installed.
-The program is installed in C: / PLS (highly recommended option!).
-
-
-To uninstall the program, click on "Uninstall DoE" in the DoE menu or run unis000.exe directly from the C: / PLS folder (manually delete any residual files and the DoE folder)
-
